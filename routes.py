@@ -86,6 +86,12 @@ def logout():
     session.pop('username', None)
     return redirect(url_for('login'))
 
+@app.route('/agente')
+def agente_main():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    return render_template('agente_main.html')
+
 @app.route('/agente/configuracion')
 def agente_configuracion():
     if 'username' not in session:
