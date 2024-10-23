@@ -86,7 +86,7 @@ def agente_configuracion():
 @app.route('/agente/test-connection', methods=['POST'])
 def test_connection():
     try:
-        # Get form data for testing connection
+        # Get current form data
         config_data = {
             'IMAP_SERVER': request.form.get('imap_server'),
             'IMAP_PORT': request.form.get('imap_port'),
@@ -95,11 +95,27 @@ def test_connection():
             'EMAIL_ADDRESS': request.form.get('email_address'),
             'EMAIL_PASSWORD': request.form.get('email_password')
         }
-        
-        # Temporarily update environment variables
-        os.environ.update(config_data)
-        
-        client = EmailClient()
+
+        # Validate required fields
+        if not all(config_data.values()):
+            return jsonify({
+                'status': 'error',
+                'message': 'Todos los campos son requeridos para probar la conexión'
+            })
+
+        # Create temporary EmailClient with form data
+        class TempEmailClient(EmailClient):
+            def __init__(self, config):
+                self.imap_server = config['IMAP_SERVER']
+                self.imap_port = int(config['IMAP_PORT'])
+                self.smtp_server = config['SMTP_SERVER']
+                self.smtp_port = int(config['SMTP_PORT'])
+                self.email_address = config['EMAIL_ADDRESS']
+                self.email_password = config['EMAIL_PASSWORD']
+                self.connection = None
+                self.smtp_connection = None
+
+        client = TempEmailClient(config_data)
         client.connect()
         client.close_connection()
         return jsonify({'status': 'success', 'message': 'Conexión exitosa a IMAP y SMTP'})

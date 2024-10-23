@@ -125,8 +125,12 @@
 // Test connection functionality
 document.getElementById('test-connection').addEventListener('click', async () => {
     try {
+        // Get form data
+        const formData = new FormData(document.querySelector('form'));
+        
         const response = await fetch('/agente/test-connection', {
             method: 'POST',
+            body: formData
         });
         const data = await response.json();
         
