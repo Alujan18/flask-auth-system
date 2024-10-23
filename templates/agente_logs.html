@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'agente_dashboard' %}active{% endif %}" href="{{ url_for('agente_dashboard') }}">
+            <i class="bi bi-speedometer2 me-2"></i>Dashboard
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'agente_configuracion' %}active{% endif %}" href="{{ url_for('agente_configuracion') }}">
+            <i class="bi bi-gear me-2"></i>Configuración
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'agente_logs' %}active{% endif %}" href="{{ url_for('agente_logs') }}">
+            <i class="bi bi-journals me-2"></i>Logs
+        </a>
+    </li>
+</ul>
+
+<div class="card">
+    <div class="card-header">
+        <h4 class="mb-0">Logs del Sistema</h4>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Tipo</th>
+                        <th>Mensaje</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.timestamp }}</td>
+                        <td><span class="badge bg-{{ log.level_class }}">{{ log.level }}</span></td>
+                        <td>{{ log.message }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

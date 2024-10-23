@@ -12,6 +12,11 @@
             <i class="bi bi-gear me-2"></i>Configuración
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'agente_logs' %}active{% endif %}" href="{{ url_for('agente_logs') }}">
+            <i class="bi bi-journals me-2"></i>Logs
+        </a>
+    </li>
 </ul>
 
 <div class="card">

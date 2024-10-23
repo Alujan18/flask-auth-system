@@ -3,8 +3,7 @@ from app import app
 import os
 from dotenv import load_dotenv, set_key
 from pathlib import Path
-import imaplib
-import smtplib
+from email_client import EmailClient
 
 # Load environment variables
 load_dotenv()
@@ -90,23 +89,18 @@ def agente_configuracion():
 @app.route('/agente/test-connection', methods=['POST'])
 def test_connection():
     try:
-        # Get current config
-        config = load_email_config()
-        
-        # Try IMAP connection
-        imap = imaplib.IMAP4_SSL(config['IMAP_SERVER'], int(config['IMAP_PORT']))
-        imap.login(config['EMAIL_ADDRESS'], config['EMAIL_PASSWORD'])
-        imap.logout()
-        
-        # Try SMTP connection
-        smtp = smtplib.SMTP(config['SMTP_SERVER'], int(config['SMTP_PORT']))
-        smtp.starttls()
-        smtp.login(config['EMAIL_ADDRESS'], config['EMAIL_PASSWORD'])
-        smtp.quit()
-        
+        client = EmailClient()
+        client.connect()
+        client.close_connection()
         return jsonify({'status': 'success', 'message': 'Conexión exitosa a IMAP y SMTP'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': f'Error de conexión: {str(e)}'})
+
+@app.route('/agente/logs')
+def agente_logs():
+    # For now, return empty logs array
+    logs = []
+    return render_template('agente_logs.html', logs=logs)
 
 @app.route('/agente/dashboard')
 def agente_dashboard():
