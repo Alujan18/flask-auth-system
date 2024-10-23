@@ -28,9 +28,17 @@
             <div class="col-md-2 px-0 border-end bg-body-tertiary sidebar">
                 <div class="p-3 fw-bold fs-5">CRM AI</div>
                 <div class="list-group list-group-flush px-3">
-                    <a href="#" class="list-group-item list-group-item-action rounded">
-                        <i class="bi bi-robot me-2"></i> Bot
-                    </a>
+                    <div class="dropdown">
+                        <a href="#" class="list-group-item list-group-item-action rounded dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-robot me-2"></i> Agente IA
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#"><i class="bi bi-chat-dots me-2"></i>Chat</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="bi bi-gear me-2"></i>Configuración</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#"><i class="bi bi-info-circle me-2"></i>Ayuda</a></li>
+                        </ul>
+                    </div>
                 </div>
             </div>
             {% endif %}
