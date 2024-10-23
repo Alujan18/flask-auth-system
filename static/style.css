@@ -1,0 +1,8 @@
+/* Minimal custom styles to complement Bootstrap */
+.card {
+    margin-bottom: 1.5rem;
+}
+
+.alert {
+    margin-bottom: 1rem;
+}
