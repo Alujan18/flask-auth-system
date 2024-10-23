@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Authentication System</title>
+    <title>CRM AI System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
@@ -11,20 +11,12 @@
 <body>
     <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom">
         <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('index') }}">Auth System</a>
-            {% if session.username %}
-            <div class="navbar-nav ms-auto">
-                <span class="nav-item nav-link">Welcome, {{ session.username }}</span>
-                <a class="nav-item nav-link" href="{{ url_for('profile') }}">Profile</a>
-                <a class="nav-item nav-link" href="{{ url_for('logout') }}">Logout</a>
-            </div>
-            {% endif %}
+            <a class="navbar-brand" href="{{ url_for('index') }}">CRM AI</a>
         </div>
     </nav>
 
     <div class="container-fluid vh-100">
         <div class="row h-100">
-            {% if session.username %}
             <div class="col-md-2 px-0 border-end bg-body-tertiary sidebar">
                 <div class="p-3 fw-bold fs-5">CRM AI</div>
                 <div class="list-group list-group-flush px-3">
@@ -33,8 +25,7 @@
                     </a>
                 </div>
             </div>
-            {% endif %}
-            <div class="{% if session.username %}col-md-10{% else %}col-md-12{% endif %} p-4">
+            <div class="col-md-10 p-4">
                 {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
                         {% for category, message in messages %}
