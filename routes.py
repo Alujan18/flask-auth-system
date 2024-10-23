@@ -12,7 +12,6 @@ import uuid
 import json
 from email.utils import parseaddr, parsedate_to_datetime
 from email_utils import decode_str, get_email_body
-from conversation_utils import process_email, load_conversations, save_conversations
 
 # Load environment variables
 load_dotenv()
@@ -55,7 +54,7 @@ def add_log(level, message):
     except Exception as e:
         print(f"Error adding log: {str(e)}")
 
-def process_emails(emails, conversations):
+def process_emails(emails):
     for email_id, msg, folder in emails:
         try:
             # Parse email headers
@@ -76,37 +75,27 @@ def process_emails(emails, conversations):
             except:
                 date = datetime.utcnow()
 
-            # Find existing thread or create new one
-            thread_id = associate_to_thread(conversations, in_reply_to, references)
+            # Find existing thread or create new one based on references
+            thread_id = None
+            if in_reply_to:
+                ref_email = EmailMessage.query.filter_by(message_id=in_reply_to).first()
+                if ref_email:
+                    thread_id = ref_email.thread_id
+            
+            if not thread_id and references:
+                for ref in references:
+                    ref_email = EmailMessage.query.filter_by(message_id=ref).first()
+                    if ref_email:
+                        thread_id = ref_email.thread_id
+                        break
+
+            # Create new thread if none found
             if not thread_id:
                 thread_id = str(uuid.uuid4())
-
-            # Update conversations structure
-            if thread_id not in conversations["threads"]:
-                conversations["threads"][thread_id] = []
-            
-            # Add message to thread
-            email_data = {
-                'message_id': message_id,
-                'from_name': from_name,
-                'from_email': from_email,
-                'subject': subject,
-                'message': body,
-                'date': date.isoformat(),
-                'in_reply_to': in_reply_to,
-                'references': references
-            }
-            conversations["threads"][thread_id].append(email_data)
-            
-            if message_id:
-                conversations["message_to_thread"][message_id] = thread_id
-
-            # Save to database
-            thread = EmailThread.query.filter_by(thread_id=thread_id).first()
-            if not thread:
                 thread = EmailThread(thread_id=thread_id, subject=subject)
                 db.session.add(thread)
             
+            # Create new email message
             msg = EmailMessage(
                 message_id=message_id,
                 thread_id=thread_id,
@@ -165,9 +154,7 @@ def bot_process():
             # Fetch and process emails
             emails = email_client.fetch_emails()
             if emails:
-                conversations = load_conversations()
-                process_emails(emails, conversations)
-                save_conversations(conversations)
+                process_emails(emails)
             
             time.sleep(60)  # Check emails every minute
             
