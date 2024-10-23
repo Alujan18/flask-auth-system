@@ -90,7 +90,7 @@ def logout():
 def agente_main():
     if 'username' not in session:
         return redirect(url_for('login'))
-    return render_template('agente_main.html')
+    return redirect(url_for('agente_dashboard'))
 
 @app.route('/agente/configuracion')
 def agente_configuracion():
