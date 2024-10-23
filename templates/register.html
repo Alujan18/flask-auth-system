@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">Register</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" class="needs-validation" novalidate>
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" name="username" 
+                               pattern="^[a-zA-Z0-9_]+$" minlength="3" maxlength="80" required>
+                        <div class="form-text">Username can only contain letters, numbers, and underscores.</div>
+                        <div class="invalid-feedback">
+                            Please enter a valid username (3-80 characters, letters, numbers, and underscores only).
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                        <div class="invalid-feedback">
+                            Please enter a valid email address.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" 
+                               minlength="8" required>
+                        <div class="form-text">
+                            Password must be at least 8 characters long and contain uppercase, lowercase, and numbers.
+                        </div>
+                        <div class="invalid-feedback">
+                            Please enter a valid password.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Confirm Password</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                        <div class="invalid-feedback">
+                            Passwords do not match.
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Register</button>
+                    <a href="{{ url_for('login') }}" class="btn btn-link">Already have an account? Login</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict'
+    var forms = document.querySelectorAll('.needs-validation')
+    var password = document.getElementById('password')
+    var confirm_password = document.getElementById('confirm_password')
+
+    function validatePassword() {
+        if (password.value != confirm_password.value) {
+            confirm_password.setCustomValidity('Passwords do not match')
+        } else {
+            confirm_password.setCustomValidity('')
+        }
+    }
+
+    password.onchange = validatePassword
+    confirm_password.onkeyup = validatePassword
+
+    Array.prototype.slice.call(forms).forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            if (!form.checkValidity()) {
+                event.preventDefault()
+                event.stopPropagation()
+            }
+            form.classList.add('was-validated')
+        }, false)
+    })
+})()
+</script>
+{% endblock %}
