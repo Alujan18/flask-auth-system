@@ -12,6 +12,7 @@ import threading
 import time
 import uuid
 import json
+from sqlalchemy.exc import SQLAlchemyError
 
 # Load environment variables
 load_dotenv()
@@ -55,6 +56,7 @@ def add_log(level, message):
         print(f"Error adding log: {str(e)}")
 
 def process_emails(emails):
+    """Process incoming emails and store them in the database"""
     with app.app_context():
         for email_id, msg, folder in emails:
             try:
@@ -67,8 +69,9 @@ def process_emails(emails):
                 message_id = msg.get("Message-ID")
                 
                 # Generate UUID for empty message_id
-                if not message_id:
+                if not message_id or message_id.strip() == '':
                     message_id = f"<{str(uuid.uuid4())}@generated>"
+                    add_log('WARNING', f'Generated new message_id for email from {from_email}: {message_id}')
                 
                 in_reply_to = msg.get("In-Reply-To")
                 references = msg.get("References", "").split()
@@ -80,6 +83,7 @@ def process_emails(emails):
                     date = parsedate_to_datetime(date_str)
                 except:
                     date = datetime.utcnow()
+                    add_log('WARNING', f'Invalid date format for email from {from_email}, using current time')
 
                 try:
                     # Start a new transaction
@@ -110,6 +114,10 @@ def process_emails(emails):
                         thread = EmailThread(thread_id=thread_id, subject=subject)
                         db.session.add(thread)
                         db.session.flush()
+                    else:
+                        # Update thread's last_updated time
+                        thread = EmailThread.query.filter_by(thread_id=thread_id).first()
+                        thread.last_updated = datetime.utcnow()
                     
                     # Now create the email message
                     email_msg = EmailMessage(
@@ -137,12 +145,16 @@ In-Reply-To: {in_reply_to or 'N/A'}
 {body[:50] + '...' if len(body) > 50 else body}
 ''')
 
+                except SQLAlchemyError as e:
+                    db.session.rollback()
+                    add_log('ERROR', f'Database error processing email {message_id}: {str(e)}')
+                    continue
                 except Exception as e:
                     db.session.rollback()
                     raise
 
             except Exception as e:
-                add_log('ERROR', f'Error procesando email {email_id}: {str(e)}')
+                add_log('ERROR', f'Error processing email {email_id}: {str(e)}')
                 continue
 
 def bot_process():
@@ -314,8 +326,9 @@ def agente_logs():
     try:
         logs = Log.query.order_by(Log.timestamp.desc()).limit(100).all()
         return render_template('agente_logs.html', logs=logs)
-    except Exception as e:
+    except SQLAlchemyError as e:
         app.logger.error(f'Error fetching logs: {str(e)}')
+        flash('Error al cargar los logs', 'danger')
         return render_template('agente_logs.html', logs=[])
 
 @app.route('/agente/dashboard')
@@ -324,28 +337,43 @@ def agente_dashboard():
 
 @app.route('/agente/database')
 def agente_database():
-    # Get all unique senders
-    senders = db.session.query(EmailMessage.from_email, EmailMessage.from_name).distinct().all()
-    
-    # For each sender, get their threads and messages
-    sender_data = []
-    for from_email, from_name in senders:
-        # Get all threads where this person is a sender
-        thread_ids = db.session.query(EmailMessage.thread_id)\
-            .filter(EmailMessage.from_email == from_email)\
-            .distinct().all()
-        thread_ids = [t[0] for t in thread_ids]
+    try:
+        # Get all unique senders with their threads and messages
+        # Organize data by thread and sort by last update time
+        senders = db.session.query(
+            EmailMessage.from_email,
+            EmailMessage.from_name
+        ).distinct().all()
         
-        # Get all threads and their messages
-        threads = EmailThread.query.filter(EmailThread.thread_id.in_(thread_ids)).all()
-        messages = EmailMessage.query.filter(EmailMessage.thread_id.in_(thread_ids))\
-            .order_by(EmailMessage.date.desc()).all()
+        sender_data = []
+        for from_email, from_name in senders:
+            # Get all threads where this person is a sender
+            thread_ids = db.session.query(EmailMessage.thread_id)\
+                .filter(EmailMessage.from_email == from_email)\
+                .distinct().all()
+            thread_ids = [t[0] for t in thread_ids]
             
-        sender_data.append({
-            'email': from_email,
-            'name': from_name,
-            'threads': threads,
-            'messages': messages
-        })
-    
-    return render_template('agente_database.html', sender_data=sender_data)
+            # Get threads sorted by last_updated
+            threads = EmailThread.query\
+                .filter(EmailThread.thread_id.in_(thread_ids))\
+                .order_by(EmailThread.last_updated.desc())\
+                .all()
+            
+            # Get messages for these threads sorted by date
+            messages = EmailMessage.query\
+                .filter(EmailMessage.thread_id.in_(thread_ids))\
+                .order_by(EmailMessage.date.desc())\
+                .all()
+                
+            sender_data.append({
+                'email': from_email,
+                'name': from_name or from_email,  # Use email if name is empty
+                'threads': threads,
+                'messages': messages
+            })
+        
+        return render_template('agente_database.html', sender_data=sender_data)
+    except SQLAlchemyError as e:
+        app.logger.error(f'Database error in agente_database: {str(e)}')
+        flash('Error al cargar los datos', 'danger')
+        return render_template('agente_database.html', sender_data=[])
