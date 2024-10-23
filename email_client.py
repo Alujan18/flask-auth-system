@@ -76,9 +76,9 @@ class EmailClient:
     def fetch_emails(self):
         try:
             self.connection.select("INBOX")
-            result, data = self.connection.search(None, 'UNSEEN')
+            result, data = self.connection.search(None, 'ALL')
             if result != 'OK':
-                print("Error al buscar correos no leídos.")
+                print("Error al buscar correos.")
                 return []
         except imaplib.IMAP4.error as e:
             print(f"Error al buscar correos: {e}")
@@ -87,12 +87,19 @@ class EmailClient:
             return []
 
         emails = []
+        email_count = 0
+        max_emails = 50  # Limit to 50 emails per fetch
+
         for num in data[0].split():
+            if email_count >= max_emails:
+                break
+                
             try:
                 result, msg_data = self.connection.fetch(num, '(RFC822)')
                 if result == 'OK':
                     msg = email.message_from_bytes(msg_data[0][1])
                     emails.append((num.decode(), msg, 'INBOX'))
+                    email_count += 1
                 else:
                     print(f"Error al obtener el correo UID {num.decode()}.")
             except imaplib.IMAP4.error as e:
