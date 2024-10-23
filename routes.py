@@ -9,6 +9,7 @@ from datetime import datetime
 import threading
 import time
 from email_utils import decode_str, get_email_body
+from email.utils import parseaddr
 
 # Load environment variables
 load_dotenv()
@@ -82,23 +83,37 @@ def bot_process():
             if emails:
                 for email_id, msg, folder in emails:
                     try:
-                        # Decode email headers
-                        subject = decode_str(msg.get('subject', 'Sin asunto'))
-                        sender = decode_str(msg.get('from', 'Desconocido'))
-                        
-                        # Extract and log email content
+                        # Parse email headers
+                        from_raw = msg.get("From")
+                        name, email_addr = parseaddr(from_raw)
+                        from_name = decode_str(name)
+                        from_email = decode_str(email_addr)
+                        subject = decode_str(msg.get("Subject"))
+                        message_id = msg.get("Message-ID")
+                        in_reply_to = msg.get("In-Reply-To")
+                        references = msg.get("References")
+                        date_str = msg.get("Date")
+
+                        # Extract email body
                         body = get_email_body(msg)
                         
                         # Log email details
-                        add_log('INFO', f'Nuevo correo recibido de {sender}')
+                        add_log('INFO', f'Nuevo email de: {from_name} <{from_email}>')
+                        add_log('INFO', f'Fecha: {date_str}')
                         add_log('INFO', f'Asunto: {subject}')
                         
-                        # Log truncated body content
-                        body_preview = body[:200] + '...' if len(body) > 200 else body
+                        # Log first 50 chars of body
+                        body_preview = body[:50] + '...' if len(body) > 50 else body
                         add_log('INFO', f'Contenido: {body_preview}')
                         
+                        # Log reference info if available
+                        if message_id:
+                            add_log('INFO', f'Message-ID: {message_id}')
+                        if in_reply_to:
+                            add_log('INFO', f'En respuesta a: {in_reply_to}')
+                        
                     except Exception as e:
-                        add_log('ERROR', f'Error procesando correo {email_id}: {str(e)}')
+                        add_log('ERROR', f'Error procesando email {email_id}: {str(e)}')
             
             time.sleep(60)  # Check emails every minute
             
