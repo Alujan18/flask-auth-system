@@ -54,8 +54,8 @@ def dashboard():
         return redirect(url_for('login'))
     return render_template('dashboard.html', username=session['username'])
 
-@app.route('/change_password', methods=['GET', 'POST'])
-def change_password():
+@app.route('/profile', methods=['GET', 'POST'])
+def profile():
     if 'username' not in session:
         return redirect(url_for('login'))
 
@@ -68,18 +68,18 @@ def change_password():
 
         if not user.check_password(current_password):
             flash('Current password is incorrect', 'danger')
-            return redirect(url_for('change_password'))
+            return redirect(url_for('profile'))
 
         if new_password != confirm_password:
             flash('New passwords do not match', 'danger')
-            return redirect(url_for('change_password'))
+            return redirect(url_for('profile'))
 
         user.set_password(new_password)
         db.session.commit()
         flash('Password updated successfully', 'success')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('profile'))
 
-    return render_template('change_password.html')
+    return render_template('profile.html', username=session['username'])
 
 @app.route('/logout')
 def logout():

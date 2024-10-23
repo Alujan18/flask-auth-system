@@ -15,7 +15,7 @@
             {% if session.username %}
             <div class="navbar-nav ms-auto">
                 <span class="nav-item nav-link">Welcome, {{ session.username }}</span>
-                <a class="nav-item nav-link" href="{{ url_for('change_password') }}">Change Password</a>
+                <a class="nav-item nav-link" href="{{ url_for('profile') }}">Profile</a>
                 <a class="nav-item nav-link" href="{{ url_for('logout') }}">Logout</a>
             </div>
             {% endif %}
