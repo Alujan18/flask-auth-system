@@ -12,16 +12,13 @@
     <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom">
         <div class="container-fluid">
             <a class="navbar-brand" href="{{ url_for('index') }}">Auth System</a>
+            {% if session.username %}
             <div class="navbar-nav ms-auto">
-                {% if session.username %}
-                    <span class="nav-item nav-link">Welcome, {{ session.username }}</span>
-                    <a class="nav-item nav-link" href="{{ url_for('profile') }}">Profile</a>
-                    <a class="nav-item nav-link" href="{{ url_for('logout') }}">Logout</a>
-                {% else %}
-                    <a class="nav-item nav-link" href="{{ url_for('login') }}">Login</a>
-                    <a class="nav-item nav-link" href="{{ url_for('register') }}">Register</a>
-                {% endif %}
+                <span class="nav-item nav-link">Welcome, {{ session.username }}</span>
+                <a class="nav-item nav-link" href="{{ url_for('profile') }}">Profile</a>
+                <a class="nav-item nav-link" href="{{ url_for('logout') }}">Logout</a>
             </div>
+            {% endif %}
         </div>
     </nav>
 
