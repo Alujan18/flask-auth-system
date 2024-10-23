@@ -4,12 +4,15 @@ import os
 from dotenv import load_dotenv, set_key
 from pathlib import Path
 from email_client import EmailClient
-from models import Log
+from models import Log, EmailThread, EmailMessage
 from datetime import datetime
 import threading
 import time
+import uuid
+import json
+from email.utils import parseaddr, parsedate_to_datetime
 from email_utils import decode_str, get_email_body
-from email.utils import parseaddr
+from conversation_utils import process_email, load_conversations, save_conversations
 
 # Load environment variables
 load_dotenv()
@@ -52,6 +55,87 @@ def add_log(level, message):
     except Exception as e:
         print(f"Error adding log: {str(e)}")
 
+def process_emails(emails, conversations):
+    for email_id, msg, folder in emails:
+        try:
+            # Parse email headers
+            from_raw = msg.get("From")
+            name, email_addr = parseaddr(from_raw)
+            from_name = decode_str(name)
+            from_email = decode_str(email_addr)
+            subject = decode_str(msg.get("Subject"))
+            message_id = msg.get("Message-ID")
+            in_reply_to = msg.get("In-Reply-To")
+            references = msg.get("References", "").split()
+            date_str = msg.get("Date")
+            body = get_email_body(msg)
+            
+            # Convert date string to datetime
+            try:
+                date = parsedate_to_datetime(date_str)
+            except:
+                date = datetime.utcnow()
+
+            # Find existing thread or create new one
+            thread_id = associate_to_thread(conversations, in_reply_to, references)
+            if not thread_id:
+                thread_id = str(uuid.uuid4())
+
+            # Update conversations structure
+            if thread_id not in conversations["threads"]:
+                conversations["threads"][thread_id] = []
+            
+            # Add message to thread
+            email_data = {
+                'message_id': message_id,
+                'from_name': from_name,
+                'from_email': from_email,
+                'subject': subject,
+                'message': body,
+                'date': date.isoformat(),
+                'in_reply_to': in_reply_to,
+                'references': references
+            }
+            conversations["threads"][thread_id].append(email_data)
+            
+            if message_id:
+                conversations["message_to_thread"][message_id] = thread_id
+
+            # Save to database
+            thread = EmailThread.query.filter_by(thread_id=thread_id).first()
+            if not thread:
+                thread = EmailThread(thread_id=thread_id, subject=subject)
+                db.session.add(thread)
+            
+            msg = EmailMessage(
+                message_id=message_id,
+                thread_id=thread_id,
+                from_name=from_name,
+                from_email=from_email,
+                subject=subject,
+                body=body,
+                date=date,
+                in_reply_to=in_reply_to,
+                references=json.dumps(references)
+            )
+            db.session.add(msg)
+            db.session.commit()
+
+            # Log the processed email
+            add_log('INFO', f'''
+Thread ID: {thread_id}
+De: {from_name} <{from_email}>
+Fecha: {date_str}
+Asunto: {subject}
+Message-ID: {message_id or 'N/A'}
+In-Reply-To: {in_reply_to or 'N/A'}
+----------------------------------------
+{body[:50] + '...' if len(body) > 50 else body}
+''')
+
+        except Exception as e:
+            add_log('ERROR', f'Error procesando email {email_id}: {str(e)}')
+
 def bot_process():
     """Email bot process that runs in the background"""
     global bot_running, email_client
@@ -81,41 +165,9 @@ def bot_process():
             # Fetch and process emails
             emails = email_client.fetch_emails()
             if emails:
-                for email_id, msg, folder in emails:
-                    try:
-                        # Parse email headers
-                        from_raw = msg.get("From")
-                        name, email_addr = parseaddr(from_raw)
-                        from_name = decode_str(name)
-                        from_email = decode_str(email_addr)
-                        subject = decode_str(msg.get("Subject"))
-                        message_id = msg.get("Message-ID")
-                        in_reply_to = msg.get("In-Reply-To")
-                        references = msg.get("References")
-                        date_str = msg.get("Date")
-
-                        # Extract email body
-                        body = get_email_body(msg)
-                        
-                        # Log email details in a more organized way
-                        add_log('INFO', f'''
-De: {from_name} <{from_email}>
-Fecha: {date_str}
-Asunto: {subject}
-----------------------------------------
-{body[:50] + '...' if len(body) > 50 else body}
-''')
-
-                        if message_id or in_reply_to or references:
-                            add_log('INFO', f'''
-Referencias:
-Message-ID: {message_id or 'N/A'}
-In-Reply-To: {in_reply_to or 'N/A'}
-References: {references or 'N/A'}
-''')
-                        
-                    except Exception as e:
-                        add_log('ERROR', f'Error procesando email {email_id}: {str(e)}')
+                conversations = load_conversations()
+                process_emails(emails, conversations)
+                save_conversations(conversations)
             
             time.sleep(60)  # Check emails every minute
             
