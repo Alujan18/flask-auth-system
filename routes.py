@@ -4,9 +4,18 @@ import os
 from dotenv import load_dotenv, set_key
 from pathlib import Path
 from email_client import EmailClient
+from models import Log
+from datetime import datetime
+import threading
+import time
 
 # Load environment variables
 load_dotenv()
+
+# Global variables for bot control
+email_bot_thread = None
+bot_running = False
+email_client = None
 
 def load_email_config():
     """Load email configuration from environment variables"""
@@ -30,6 +39,50 @@ def save_to_env_file(config_data):
     # Update each configuration value
     for key, value in config_data.items():
         set_key(str(env_path), key, str(value))
+
+def add_log(level, message):
+    """Add a log entry to the database"""
+    with app.app_context():
+        log = Log(level=level, message=message)
+        db.session.add(log)
+        db.session.commit()
+
+def bot_process():
+    """Email bot process that runs in the background"""
+    global bot_running, email_client
+    
+    add_log('INFO', 'Bot iniciado')
+    
+    while bot_running:
+        try:
+            if not email_client:
+                email_client = EmailClient()
+                email_client.connect()
+                add_log('INFO', 'Conexión establecida con el servidor de correo')
+            
+            # Fetch and process emails
+            emails = email_client.fetch_emails()
+            if emails:
+                for email_id, msg, folder in emails:
+                    subject = msg.get('subject', 'Sin asunto')
+                    sender = msg.get('from', 'Desconocido')
+                    add_log('INFO', f'Nuevo correo recibido de {sender}: {subject}')
+            
+            time.sleep(60)  # Check emails every minute
+            
+        except Exception as e:
+            add_log('ERROR', f'Error en el bot: {str(e)}')
+            if email_client:
+                try:
+                    email_client.close_connection()
+                except:
+                    pass
+            email_client = None
+            time.sleep(60)  # Wait before retrying
+    
+    if email_client:
+        email_client.close_connection()
+    add_log('INFO', 'Bot detenido')
 
 @app.route('/')
 def index():
@@ -122,11 +175,44 @@ def test_connection():
     except Exception as e:
         return jsonify({'status': 'error', 'message': f'Error de conexión: {str(e)}'})
 
+@app.route('/agente/bot/toggle', methods=['POST'])
+def toggle_bot():
+    global bot_running, email_bot_thread
+    
+    try:
+        if not bot_running:
+            # Check if configuration exists
+            config = load_email_config()
+            if not all(config.values()):
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Configure los datos del servidor de correo primero'
+                })
+            
+            # Start bot
+            bot_running = True
+            email_bot_thread = threading.Thread(target=bot_process)
+            email_bot_thread.daemon = True
+            email_bot_thread.start()
+            return jsonify({'status': 'success', 'message': 'Bot iniciado', 'running': True})
+        else:
+            # Stop bot
+            bot_running = False
+            if email_bot_thread:
+                email_bot_thread.join(timeout=2)
+            return jsonify({'status': 'success', 'message': 'Bot detenido', 'running': False})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'Error: {str(e)}'})
+
+@app.route('/agente/bot/status')
+def bot_status():
+    return jsonify({'running': bot_running})
+
 @app.route('/agente/logs')
 def agente_logs():
-    logs = []
+    logs = Log.query.order_by(Log.timestamp.desc()).limit(100).all()
     return render_template('agente_logs.html', logs=logs)
 
 @app.route('/agente/dashboard')
 def agente_dashboard():
-    return render_template('agente_dashboard.html')
+    return render_template('agente_dashboard.html', bot_running=bot_running)
