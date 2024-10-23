@@ -6,3 +6,24 @@
 .alert {
     margin-bottom: 1rem;
 }
+
+/* Sidebar styling */
+.sidebar {
+    min-height: calc(100vh - 56px);
+    border-right: 1px solid var(--bs-border-color);
+}
+
+.sidebar-heading {
+    font-size: 1.2rem;
+    font-weight: bold;
+    padding: 0.5rem 0;
+}
+
+.list-group-item {
+    background-color: transparent;
+    border: 1px solid var(--bs-border-color);
+}
+
+.list-group-item:hover {
+    background-color: var(--bs-dark);
+}
