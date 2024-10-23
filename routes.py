@@ -9,9 +9,7 @@ from datetime import datetime
 
 @app.route('/')
 def index():
-    if 'username' in session:
-        return redirect(url_for('dashboard'))
-    return redirect(url_for('login'))
+    return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -28,7 +26,8 @@ def register():
             flash('Passwords do not match', 'danger')
             return redirect(url_for('register'))
 
-        user = User(username=username)
+        user = User()
+        user.username = username
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
@@ -64,12 +63,16 @@ def profile():
     if 'username' not in session:
         return redirect(url_for('login'))
 
+    user = User.query.filter_by(username=session['username']).first()
+    if not user:
+        session.pop('username', None)
+        flash('User not found', 'danger')
+        return redirect(url_for('login'))
+
     if request.method == 'POST':
         current_password = request.form.get('current_password')
         new_password = request.form.get('new_password')
         confirm_password = request.form.get('confirm_password')
-
-        user = User.query.filter_by(username=session['username']).first()
 
         if not user.check_password(current_password):
             flash('Current password is incorrect', 'danger')
@@ -103,11 +106,15 @@ def agente_configuracion():
         return redirect(url_for('login'))
     
     user = User.query.filter_by(username=session['username']).first()
+    if not user:
+        session.pop('username', None)
+        flash('User not found', 'danger')
+        return redirect(url_for('login'))
     
     if request.method == 'POST':
         user.email = request.form.get('email')
         user.email_server = request.form.get('email_server')
-        user.email_port = int(request.form.get('email_port'))
+        user.email_port = int(request.form.get('email_port', 993))
         
         email_password = request.form.get('email_password')
         if email_password:  # Only update if new password provided
@@ -115,12 +122,16 @@ def agente_configuracion():
             
         try:
             # Test the email connection
-            imap = imaplib.IMAP4_SSL(user.email_server, user.email_port)
-            imap.login(user.email, user.email_password)
-            imap.logout()
-            
-            db.session.commit()
-            flash('Email configuration updated successfully', 'success')
+            if user.email and user.email_password and user.email_server:
+                imap = imaplib.IMAP4_SSL(user.email_server, user.email_port or 993)
+                imap.login(user.email, user.email_password)
+                imap.logout()
+                
+                db.session.commit()
+                flash('Email configuration updated successfully', 'success')
+            else:
+                flash('Please fill in all required fields', 'danger')
+                return redirect(url_for('agente_configuracion'))
         except Exception as e:
             flash(f'Failed to connect to email server: {str(e)}', 'danger')
             return redirect(url_for('agente_configuracion'))
@@ -144,7 +155,7 @@ def get_email_date(msg):
     date_str = msg.get('date', '')
     try:
         # Parse the email date string into a datetime object
-        date = email.utils.parsedate_to_datetime(date_str)
+        date = datetime.strptime(date_str, '%a, %d %b %Y %H:%M:%S %z')
         # Format the date
         return date.strftime('%Y-%m-%d %H:%M')
     except:
@@ -156,13 +167,18 @@ def agente_dashboard():
         return redirect(url_for('login'))
         
     user = User.query.filter_by(username=session['username']).first()
+    if not user:
+        session.pop('username', None)
+        flash('User not found', 'danger')
+        return redirect(url_for('login'))
+        
     email_configured = bool(user.email and user.email_password and user.email_server)
     
     recent_emails = []
     if email_configured:
         try:
             # Connect to the email server
-            imap = imaplib.IMAP4_SSL(user.email_server, user.email_port)
+            imap = imaplib.IMAP4_SSL(user.email_server, user.email_port or 993)
             imap.login(user.email, user.email_password)
             
             # Select the inbox
@@ -170,19 +186,24 @@ def agente_dashboard():
             
             # Search for all emails and get the latest 10
             _, messages = imap.search(None, 'ALL')
-            email_ids = messages[0].split()
-            
-            # Get the last 10 emails
-            for email_id in email_ids[-10:]:
-                _, msg_data = imap.fetch(email_id, '(RFC822)')
-                email_body = msg_data[0][1]
-                msg = email.message_from_bytes(email_body)
+            if messages and messages[0]:
+                email_ids = messages[0].split()
                 
-                recent_emails.append({
-                    'subject': get_email_subject(msg),
-                    'from': msg.get('from', 'Unknown'),
-                    'date': get_email_date(msg)
-                })
+                # Get the last 10 emails
+                for email_id in email_ids[-10:]:
+                    try:
+                        _, msg_data = imap.fetch(email_id, '(RFC822)')
+                        if msg_data and msg_data[0] and isinstance(msg_data[0][1], bytes):
+                            email_body = msg_data[0][1]
+                            msg = email.message_from_bytes(email_body)
+                            
+                            recent_emails.append({
+                                'subject': get_email_subject(msg),
+                                'from': msg.get('from', 'Unknown'),
+                                'date': get_email_date(msg)
+                            })
+                    except Exception as e:
+                        continue
             
             recent_emails.reverse()  # Show newest first
             imap.logout()
