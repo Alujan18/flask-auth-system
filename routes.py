@@ -85,3 +85,15 @@ def profile():
 def logout():
     session.pop('username', None)
     return redirect(url_for('login'))
+
+@app.route('/agente/configuracion')
+def agente_configuracion():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    return render_template('agente_configuracion.html')
+
+@app.route('/agente/dashboard')
+def agente_dashboard():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    return render_template('agente_dashboard.html')
