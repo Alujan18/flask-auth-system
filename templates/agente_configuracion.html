@@ -16,10 +16,31 @@
 
 <div class="card">
     <div class="card-header">
-        <h4 class="mb-0">Configuración</h4>
+        <h4 class="mb-0">Configuración de Email</h4>
     </div>
     <div class="card-body">
-        <p>Página de configuración del Agente IA.</p>
+        <form method="POST" action="{{ url_for('agente_configuracion') }}">
+            <div class="mb-3">
+                <label for="email" class="form-label">Dirección de Email</label>
+                <input type="email" class="form-control" id="email" name="email" value="{{ email }}" required>
+            </div>
+            <div class="mb-3">
+                <label for="email_password" class="form-label">Contraseña de Email</label>
+                <input type="password" class="form-control" id="email_password" name="email_password" placeholder="••••••••">
+                <small class="text-muted">Dejar en blanco para mantener la contraseña actual</small>
+            </div>
+            <div class="mb-3">
+                <label for="email_server" class="form-label">Servidor IMAP</label>
+                <input type="text" class="form-control" id="email_server" name="email_server" value="{{ email_server }}" required>
+                <small class="text-muted">Ejemplo: imap.gmail.com</small>
+            </div>
+            <div class="mb-3">
+                <label for="email_port" class="form-label">Puerto IMAP</label>
+                <input type="number" class="form-control" id="email_port" name="email_port" value="{{ email_port }}" required>
+                <small class="text-muted">Puerto común: 993</small>
+            </div>
+            <button type="submit" class="btn btn-primary">Guardar Configuración</button>
+        </form>
     </div>
 </div>
 {% endblock %}
