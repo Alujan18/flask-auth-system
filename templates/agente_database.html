@@ -65,7 +65,12 @@
                                         <tbody>
                                             {% for message in sender.messages if message.thread_id == thread.thread_id %}
                                             <tr>
-                                                <td>{{ message.from_name }} &lt;{{ message.from_email }}&gt;</td>
+                                                <td>
+                                                    {{ message.from_name }} &lt;{{ message.from_email }}&gt;
+                                                    {% if message.folder == 'Sent' %}
+                                                        <span class="badge bg-info">Enviado</span>
+                                                    {% endif %}
+                                                </td>
                                                 <td>{{ message.date.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                                                 <td>{{ message.subject }}</td>
                                                 <td>

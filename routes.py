@@ -56,7 +56,6 @@ def add_log(level, message):
             db.session.commit()
     except Exception as e:
         print(f"Error adding log: {str(e)}")
-        # Try to rollback if possible
         try:
             db.session.rollback()
         except:
@@ -64,84 +63,84 @@ def add_log(level, message):
 
 def process_emails(emails):
     """Process incoming emails and store them in the database"""
-    with app.app_context():
-        for email_id, msg, folder in emails:
+    for email_id, msg, folder in emails:
+        try:
+            # Parse email headers
+            from_raw = msg.get("From")
+            name, email_addr = parseaddr(from_raw)
+            from_name = decode_str(name)
+            from_email = decode_str(email_addr)
+            subject = decode_str(msg.get("Subject"))
+            message_id = msg.get("Message-ID")
+            
+            # Generate UUID for empty message_id
+            if not message_id or message_id.strip() == '':
+                message_id = f"<{str(uuid.uuid4())}@generated>"
+                add_log('WARNING', f'Generated new message_id for email from {from_email}: {message_id}')
+            
+            in_reply_to = msg.get("In-Reply-To")
+            references = msg.get("References", "").split()
+            date_str = msg.get("Date")
+            body = get_email_body(msg)
+            
+            # Convert date string to datetime
             try:
-                # Parse email headers
-                from_raw = msg.get("From")
-                name, email_addr = parseaddr(from_raw)
-                from_name = decode_str(name)
-                from_email = decode_str(email_addr)
-                subject = decode_str(msg.get("Subject"))
-                message_id = msg.get("Message-ID")
-                
-                # Generate UUID for empty message_id
-                if not message_id or message_id.strip() == '':
-                    message_id = f"<{str(uuid.uuid4())}@generated>"
-                    add_log('WARNING', f'Generated new message_id for email from {from_email}: {message_id}')
-                
-                in_reply_to = msg.get("In-Reply-To")
-                references = msg.get("References", "").split()
-                date_str = msg.get("Date")
-                body = get_email_body(msg)
-                
-                # Convert date string to datetime
-                try:
-                    date = parsedate_to_datetime(date_str)
-                except:
-                    date = datetime.utcnow()
-                    add_log('WARNING', f'Invalid date format for email from {from_email}, using current time')
+                date = parsedate_to_datetime(date_str)
+            except:
+                date = datetime.utcnow()
+                add_log('WARNING', f'Invalid date format for email from {from_email}, using current time')
 
-                try:
-                    # Start a new transaction
-                    db.session.begin_nested()
+            try:
+                # Start a new transaction
+                db.session.begin_nested()
 
-                    # Find existing message first to avoid duplicates
-                    existing_message = EmailMessage.query.filter_by(message_id=message_id).first()
-                    if existing_message:
-                        add_log('WARNING', f'Email with message_id {message_id} already exists, skipping')
-                        continue
+                # Find existing message first to avoid duplicates
+                existing_message = EmailMessage.query.filter_by(message_id=message_id).first()
+                if existing_message:
+                    add_log('WARNING', f'Email with message_id {message_id} already exists, skipping')
+                    continue
 
-                    # Find or create thread first
-                    thread_id = None
-                    if in_reply_to:
-                        ref_email = EmailMessage.query.filter_by(message_id=in_reply_to).first()
+                # Find or create thread first
+                thread_id = None
+                if in_reply_to:
+                    ref_email = EmailMessage.query.filter_by(message_id=in_reply_to).first()
+                    if ref_email:
+                        thread_id = ref_email.thread_id
+                
+                if not thread_id and references:
+                    for ref in references:
+                        ref_email = EmailMessage.query.filter_by(message_id=ref).first()
                         if ref_email:
                             thread_id = ref_email.thread_id
-                    
-                    if not thread_id and references:
-                        for ref in references:
-                            ref_email = EmailMessage.query.filter_by(message_id=ref).first()
-                            if ref_email:
-                                thread_id = ref_email.thread_id
-                                break
+                            break
 
-                    if not thread_id:
-                        thread_id = str(uuid.uuid4())
-                        thread = EmailThread(thread_id=thread_id, subject=subject)
-                        db.session.add(thread)
-                        db.session.flush()
-                    else:
-                        # Update thread's last_updated time
-                        thread = EmailThread.query.filter_by(thread_id=thread_id).first()
-                        thread.last_updated = datetime.utcnow()
-                    
-                    # Now create the email message
-                    email_msg = EmailMessage(
-                        message_id=message_id,
-                        thread_id=thread_id,
-                        from_name=from_name,
-                        from_email=from_email,
-                        subject=subject,
-                        body=body,
-                        date=date,
-                        in_reply_to=in_reply_to,
-                        references=json.dumps(references)
-                    )
-                    db.session.add(email_msg)
-                    db.session.commit()
+                if not thread_id:
+                    thread_id = str(uuid.uuid4())
+                    thread = EmailThread(thread_id=thread_id, subject=subject)
+                    db.session.add(thread)
+                    db.session.flush()
+                else:
+                    # Update thread's last_updated time
+                    thread = EmailThread.query.filter_by(thread_id=thread_id).first()
+                    thread.last_updated = datetime.utcnow()
+                
+                # Create the email message
+                email_msg = EmailMessage(
+                    message_id=message_id,
+                    thread_id=thread_id,
+                    from_name=from_name,
+                    from_email=from_email,
+                    subject=subject,
+                    body=body,
+                    date=date,
+                    in_reply_to=in_reply_to,
+                    references=json.dumps(references),
+                    folder=folder
+                )
+                db.session.add(email_msg)
+                db.session.commit()
 
-                    add_log('INFO', f'''Nuevo email procesado:
+                add_log('INFO', f'''Nuevo email procesado:
 Thread ID: {thread_id}
 De: {from_name} <{from_email}>
 Fecha: {date_str}
@@ -152,24 +151,24 @@ In-Reply-To: {in_reply_to or 'N/A'}
 {body[:50] + '...' if len(body) > 50 else body}
 ''')
 
-                except SQLAlchemyError as e:
-                    db.session.rollback()
-                    add_log('ERROR', f'Database error processing email {message_id}: {str(e)}')
-                    continue
-                except Exception as e:
-                    db.session.rollback()
-                    add_log('ERROR', f'Unexpected error processing email {message_id}: {str(e)}')
-                    continue
-
-            except Exception as e:
-                add_log('ERROR', f'Error processing email {email_id}: {str(e)}')
+            except SQLAlchemyError as e:
+                db.session.rollback()
+                add_log('ERROR', f'Database error processing email {message_id}: {str(e)}')
                 continue
+            except Exception as e:
+                db.session.rollback()
+                add_log('ERROR', f'Unexpected error processing email {message_id}: {str(e)}')
+                continue
+
+        except Exception as e:
+            add_log('ERROR', f'Error processing email {email_id}: {str(e)}')
+            continue
 
 def bot_process():
     """Email bot process that runs in the background"""
     global bot_running, email_client
     
-    with bot_lock:
+    with app.app_context():
         add_log('INFO', 'Bot iniciado')
         connection_retry_count = 0
         max_retries = 3
@@ -349,7 +348,6 @@ def agente_dashboard():
 def agente_database():
     try:
         # Get all unique senders with their threads and messages
-        # Organize data by thread and sort by last update time
         senders = db.session.query(
             EmailMessage.from_email,
             EmailMessage.from_name
@@ -357,33 +355,38 @@ def agente_database():
         
         sender_data = []
         for from_email, from_name in senders:
-            # Get all threads where this person is a sender
-            thread_ids = db.session.query(EmailMessage.thread_id)\
-                .filter(EmailMessage.from_email == from_email)\
+            # Get all threads where this person is either sender or recipient
+            thread_ids = db.session.query(EmailThread.thread_id)\
+                .join(EmailMessage)\
+                .filter(
+                    (EmailMessage.from_email == from_email) |
+                    (EmailMessage.folder == 'Sent')
+                )\
                 .distinct().all()
             thread_ids = [t[0] for t in thread_ids]
             
-            # Get threads sorted by last_updated
-            threads = EmailThread.query\
-                .filter(EmailThread.thread_id.in_(thread_ids))\
-                .order_by(EmailThread.last_updated.desc())\
-                .all()
-            
-            # Get messages for these threads sorted by date
-            messages = EmailMessage.query\
-                .filter(EmailMessage.thread_id.in_(thread_ids))\
-                .order_by(EmailMessage.date.desc())\
-                .all()
+            if thread_ids:  # Only proceed if there are threads
+                # Get threads sorted by last_updated
+                threads = EmailThread.query\
+                    .filter(EmailThread.thread_id.in_(thread_ids))\
+                    .order_by(EmailThread.last_updated.desc())\
+                    .all()
                 
-            sender_data.append({
-                'email': from_email,
-                'name': from_name or from_email,  # Use email if name is empty
-                'threads': threads,
-                'messages': messages
-            })
+                # Get messages for these threads sorted by date
+                messages = EmailMessage.query\
+                    .filter(EmailMessage.thread_id.in_(thread_ids))\
+                    .order_by(EmailMessage.date.desc())\
+                    .all()
+                    
+                sender_data.append({
+                    'email': from_email,
+                    'name': from_name or from_email,
+                    'threads': threads,
+                    'messages': messages
+                })
         
         return render_template('agente_database.html', sender_data=sender_data)
-    except SQLAlchemyError as e:
-        app.logger.error(f'Database error in agente_database: {str(e)}')
+    except Exception as e:
+        app.logger.error(f'Error in agente_database: {str(e)}')
         flash('Error al cargar los datos', 'danger')
         return render_template('agente_database.html', sender_data=[])

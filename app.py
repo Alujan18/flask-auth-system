@@ -13,6 +13,9 @@ class Base(DeclarativeBase):
 db = SQLAlchemy(model_class=Base)
 app = Flask(__name__)
 
+# Add secret key for Flask sessions
+app.secret_key = os.environ.get('SECRET_KEY') or os.urandom(24)
+
 # Setup configuration
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {

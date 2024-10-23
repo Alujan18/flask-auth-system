@@ -78,37 +78,37 @@ class EmailClient:
                 print(f"Error al cerrar la conexión SMTP: {e}")
 
     def fetch_emails(self):
-        try:
-            self.connection.select("INBOX")
-            # Sort by date in descending order (newest first)
-            result, data = self.connection.sort('REVERSE DATE', 'UTF-8', 'ALL')
-            if result != 'OK':
-                print("Error al buscar correos.")
-                return []
-        except imaplib.IMAP4.error as e:
-            print(f"Error al buscar correos: {e}")
-            print("Intentando reconectar al servidor IMAP.")
-            self.reconnect_imap()
-            return []
-
         emails = []
-        email_count = 0
-        max_emails = 50  # Limit to 50 emails per fetch
-
-        for num in data[0].split():
-            if email_count >= max_emails:
-                break
-                
+        folders = ["INBOX", "Sent"]  # Check both INBOX and Sent folders
+        
+        for folder in folders:
             try:
-                result, msg_data = self.connection.fetch(num, '(RFC822)')
-                if result == 'OK':
-                    msg = email.message_from_bytes(msg_data[0][1])
-                    emails.append((num.decode(), msg, 'INBOX'))
-                    email_count += 1
-                else:
-                    print(f"Error al obtener el correo UID {num.decode()}.")
-            except imaplib.IMAP4.error as e:
-                print(f"Error al obtener el correo UID {num.decode()}: {e}")
+                self.connection.select(folder)
+                result, data = self.connection.sort('REVERSE DATE', 'UTF-8', 'ALL')
+                if result != 'OK':
+                    print(f"Error al buscar correos en {folder}.")
+                    continue
+                    
+                email_count = 0
+                max_emails = 50  # Limit per folder
+                
+                for num in data[0].split():
+                    if email_count >= max_emails:
+                        break
+                        
+                    try:
+                        result, msg_data = self.connection.fetch(num, '(RFC822)')
+                        if result == 'OK':
+                            msg = email.message_from_bytes(msg_data[0][1])
+                            emails.append((num.decode(), msg, folder))
+                            email_count += 1
+                        else:
+                            print(f"Error al obtener el correo UID {num.decode()} de {folder}.")
+                    except Exception as e:
+                        print(f"Error al obtener el correo UID {num.decode()} de {folder}: {e}")
+            except Exception as e:
+                print(f"Error al acceder a la carpeta {folder}: {e}")
+                
         return emails
 
     def send_email(self, to_email, subject, body, in_reply_to=None, references=None, max_retries=3):

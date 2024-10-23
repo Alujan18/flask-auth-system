@@ -33,3 +33,4 @@ class EmailMessage(db.Model):
     date = db.Column(db.DateTime)
     in_reply_to = db.Column(db.String(255))
     references = db.Column(db.Text)  # Store as JSON string
+    folder = db.Column(db.String(50))  # Added folder field
