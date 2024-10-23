@@ -19,6 +19,10 @@ class EmailClient:
         self.smtp_connection = None
 
     def connect(self):
+        if not all([self.imap_server, self.imap_port, self.smtp_server, 
+                   self.smtp_port, self.email_address, self.email_password]):
+            raise ValueError("Email configuration is incomplete")
+
         # Conexión al servidor IMAP
         try:
             self.connection = imaplib.IMAP4_SSL(self.imap_server, self.imap_port)
@@ -76,7 +80,8 @@ class EmailClient:
     def fetch_emails(self):
         try:
             self.connection.select("INBOX")
-            result, data = self.connection.search(None, 'ALL')
+            # Sort by date in descending order (newest first)
+            result, data = self.connection.sort('REVERSE DATE', 'UTF-8', 'ALL')
             if result != 'OK':
                 print("Error al buscar correos.")
                 return []

@@ -97,20 +97,22 @@ def bot_process():
                         # Extract email body
                         body = get_email_body(msg)
                         
-                        # Log email details
-                        add_log('INFO', f'Nuevo email de: {from_name} <{from_email}>')
-                        add_log('INFO', f'Fecha: {date_str}')
-                        add_log('INFO', f'Asunto: {subject}')
-                        
-                        # Log first 50 chars of body
-                        body_preview = body[:50] + '...' if len(body) > 50 else body
-                        add_log('INFO', f'Contenido: {body_preview}')
-                        
-                        # Log reference info if available
-                        if message_id:
-                            add_log('INFO', f'Message-ID: {message_id}')
-                        if in_reply_to:
-                            add_log('INFO', f'En respuesta a: {in_reply_to}')
+                        # Log email details in a more organized way
+                        add_log('INFO', f'''
+De: {from_name} <{from_email}>
+Fecha: {date_str}
+Asunto: {subject}
+----------------------------------------
+{body[:50] + '...' if len(body) > 50 else body}
+''')
+
+                        if message_id or in_reply_to or references:
+                            add_log('INFO', f'''
+Referencias:
+Message-ID: {message_id or 'N/A'}
+In-Reply-To: {in_reply_to or 'N/A'}
+References: {references or 'N/A'}
+''')
                         
                     except Exception as e:
                         add_log('ERROR', f'Error procesando email {email_id}: {str(e)}')
@@ -250,8 +252,12 @@ def bot_status():
 
 @app.route('/agente/logs')
 def agente_logs():
-    logs = Log.query.order_by(Log.timestamp.desc()).limit(100).all()
-    return render_template('agente_logs.html', logs=logs)
+    try:
+        logs = Log.query.order_by(Log.timestamp.desc()).limit(100).all()
+        return render_template('agente_logs.html', logs=logs)
+    except Exception as e:
+        app.logger.error(f'Error fetching logs: {str(e)}')
+        return render_template('agente_logs.html', logs=[])
 
 @app.route('/agente/dashboard')
 def agente_dashboard():
