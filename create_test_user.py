@@ -20,7 +20,8 @@ def create_test_user():
             else:
                 # Create new test user
                 try:
-                    test_user = User(username="testuser")  # Use constructor properly
+                    test_user = User()
+                    test_user.username = "testuser"
                     test_user.set_password("Test@123")
                     db.session.add(test_user)
                     db.session.commit()
