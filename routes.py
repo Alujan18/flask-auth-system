@@ -55,63 +55,64 @@ def add_log(level, message):
         print(f"Error adding log: {str(e)}")
 
 def process_emails(emails):
-    for email_id, msg, folder in emails:
-        try:
-            # Parse email headers
-            from_raw = msg.get("From")
-            name, email_addr = parseaddr(from_raw)
-            from_name = decode_str(name)
-            from_email = decode_str(email_addr)
-            subject = decode_str(msg.get("Subject"))
-            message_id = msg.get("Message-ID")
-            in_reply_to = msg.get("In-Reply-To")
-            references = msg.get("References", "").split()
-            date_str = msg.get("Date")
-            body = get_email_body(msg)
-            
-            # Convert date string to datetime
+    with app.app_context():
+        for email_id, msg, folder in emails:
             try:
-                date = parsedate_to_datetime(date_str)
-            except:
-                date = datetime.utcnow()
+                # Parse email headers
+                from_raw = msg.get("From")
+                name, email_addr = parseaddr(from_raw)
+                from_name = decode_str(name)
+                from_email = decode_str(email_addr)
+                subject = decode_str(msg.get("Subject"))
+                message_id = msg.get("Message-ID")
+                in_reply_to = msg.get("In-Reply-To")
+                references = msg.get("References", "").split()
+                date_str = msg.get("Date")
+                body = get_email_body(msg)
+                
+                # Convert date string to datetime
+                try:
+                    date = parsedate_to_datetime(date_str)
+                except:
+                    date = datetime.utcnow()
 
-            # Find existing thread or create new one based on references
-            thread_id = None
-            if in_reply_to:
-                ref_email = EmailMessage.query.filter_by(message_id=in_reply_to).first()
-                if ref_email:
-                    thread_id = ref_email.thread_id
-            
-            if not thread_id and references:
-                for ref in references:
-                    ref_email = EmailMessage.query.filter_by(message_id=ref).first()
+                # Find existing thread or create new one based on references
+                thread_id = None
+                if in_reply_to:
+                    ref_email = EmailMessage.query.filter_by(message_id=in_reply_to).first()
                     if ref_email:
                         thread_id = ref_email.thread_id
-                        break
+                
+                if not thread_id and references:
+                    for ref in references:
+                        ref_email = EmailMessage.query.filter_by(message_id=ref).first()
+                        if ref_email:
+                            thread_id = ref_email.thread_id
+                            break
 
-            # Create new thread if none found
-            if not thread_id:
-                thread_id = str(uuid.uuid4())
-                thread = EmailThread(thread_id=thread_id, subject=subject)
-                db.session.add(thread)
-            
-            # Create new email message
-            msg = EmailMessage(
-                message_id=message_id,
-                thread_id=thread_id,
-                from_name=from_name,
-                from_email=from_email,
-                subject=subject,
-                body=body,
-                date=date,
-                in_reply_to=in_reply_to,
-                references=json.dumps(references)
-            )
-            db.session.add(msg)
-            db.session.commit()
+                # Create new thread if none found
+                if not thread_id:
+                    thread_id = str(uuid.uuid4())
+                    thread = EmailThread(thread_id=thread_id, subject=subject)
+                    db.session.add(thread)
+                
+                # Create new email message
+                msg = EmailMessage(
+                    message_id=message_id,
+                    thread_id=thread_id,
+                    from_name=from_name,
+                    from_email=from_email,
+                    subject=subject,
+                    body=body,
+                    date=date,
+                    in_reply_to=in_reply_to,
+                    references=json.dumps(references)
+                )
+                db.session.add(msg)
+                db.session.commit()
 
-            # Log the processed email
-            add_log('INFO', f'''
+                # Log the processed email
+                add_log('INFO', f'''
 Thread ID: {thread_id}
 De: {from_name} <{from_email}>
 Fecha: {date_str}
@@ -122,8 +123,8 @@ In-Reply-To: {in_reply_to or 'N/A'}
 {body[:50] + '...' if len(body) > 50 else body}
 ''')
 
-        except Exception as e:
-            add_log('ERROR', f'Error procesando email {email_id}: {str(e)}')
+            except Exception as e:
+                add_log('ERROR', f'Error procesando email {email_id}: {str(e)}')
 
 def bot_process():
     """Email bot process that runs in the background"""
@@ -292,8 +293,9 @@ def bot_status():
 @app.route('/agente/logs')
 def agente_logs():
     try:
-        logs = Log.query.order_by(Log.timestamp.desc()).limit(100).all()
-        return render_template('agente_logs.html', logs=logs)
+        with app.app_context():
+            logs = Log.query.order_by(Log.timestamp.desc()).limit(100).all()
+            return render_template('agente_logs.html', logs=logs)
     except Exception as e:
         app.logger.error(f'Error fetching logs: {str(e)}')
         return render_template('agente_logs.html', logs=[])
