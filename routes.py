@@ -8,6 +8,7 @@ from models import Log
 from datetime import datetime
 import threading
 import time
+from email_utils import decode_str, get_email_body
 
 # Load environment variables
 load_dotenv()
@@ -42,31 +43,62 @@ def save_to_env_file(config_data):
 
 def add_log(level, message):
     """Add a log entry to the database"""
-    with app.app_context():
-        log = Log(level=level, message=message)
-        db.session.add(log)
-        db.session.commit()
+    try:
+        with app.app_context():
+            log = Log(level=level, message=message)
+            db.session.add(log)
+            db.session.commit()
+    except Exception as e:
+        print(f"Error adding log: {str(e)}")
 
 def bot_process():
     """Email bot process that runs in the background"""
     global bot_running, email_client
     
     add_log('INFO', 'Bot iniciado')
+    connection_retry_count = 0
+    max_retries = 3
     
     while bot_running:
         try:
             if not email_client:
                 email_client = EmailClient()
-                email_client.connect()
-                add_log('INFO', 'Conexión establecida con el servidor de correo')
+                try:
+                    email_client.connect()
+                    add_log('SUCCESS', 'Conexión establecida con el servidor de correo')
+                    connection_retry_count = 0
+                except Exception as e:
+                    connection_retry_count += 1
+                    add_log('ERROR', f'Error de conexión (intento {connection_retry_count}): {str(e)}')
+                    if connection_retry_count >= max_retries:
+                        add_log('ERROR', 'Número máximo de intentos de conexión alcanzado')
+                        bot_running = False
+                        break
+                    time.sleep(60)  # Wait before retry
+                    continue
             
             # Fetch and process emails
             emails = email_client.fetch_emails()
             if emails:
                 for email_id, msg, folder in emails:
-                    subject = msg.get('subject', 'Sin asunto')
-                    sender = msg.get('from', 'Desconocido')
-                    add_log('INFO', f'Nuevo correo recibido de {sender}: {subject}')
+                    try:
+                        # Decode email headers
+                        subject = decode_str(msg.get('subject', 'Sin asunto'))
+                        sender = decode_str(msg.get('from', 'Desconocido'))
+                        
+                        # Extract and log email content
+                        body = get_email_body(msg)
+                        
+                        # Log email details
+                        add_log('INFO', f'Nuevo correo recibido de {sender}')
+                        add_log('INFO', f'Asunto: {subject}')
+                        
+                        # Log truncated body content
+                        body_preview = body[:200] + '...' if len(body) > 200 else body
+                        add_log('INFO', f'Contenido: {body_preview}')
+                        
+                    except Exception as e:
+                        add_log('ERROR', f'Error procesando correo {email_id}: {str(e)}')
             
             time.sleep(60)  # Check emails every minute
             
@@ -75,13 +107,18 @@ def bot_process():
             if email_client:
                 try:
                     email_client.close_connection()
+                    add_log('WARNING', 'Conexión cerrada debido a error')
                 except:
                     pass
             email_client = None
             time.sleep(60)  # Wait before retrying
     
     if email_client:
-        email_client.close_connection()
+        try:
+            email_client.close_connection()
+            add_log('INFO', 'Conexión cerrada correctamente')
+        except Exception as e:
+            add_log('ERROR', f'Error al cerrar la conexión: {str(e)}')
     add_log('INFO', 'Bot detenido')
 
 @app.route('/')
@@ -139,7 +176,6 @@ def agente_configuracion():
 @app.route('/agente/test-connection', methods=['POST'])
 def test_connection():
     try:
-        # Get current form data
         config_data = {
             'IMAP_SERVER': request.form.get('imap_server'),
             'IMAP_PORT': request.form.get('imap_port'),
@@ -157,18 +193,7 @@ def test_connection():
             })
 
         # Create temporary EmailClient with form data
-        class TempEmailClient(EmailClient):
-            def __init__(self, config):
-                self.imap_server = config['IMAP_SERVER']
-                self.imap_port = int(config['IMAP_PORT'])
-                self.smtp_server = config['SMTP_SERVER']
-                self.smtp_port = int(config['SMTP_PORT'])
-                self.email_address = config['EMAIL_ADDRESS']
-                self.email_password = config['EMAIL_PASSWORD']
-                self.connection = None
-                self.smtp_connection = None
-
-        client = TempEmailClient(config_data)
+        client = EmailClient()
         client.connect()
         client.close_connection()
         return jsonify({'status': 'success', 'message': 'Conexión exitosa a IMAP y SMTP'})
