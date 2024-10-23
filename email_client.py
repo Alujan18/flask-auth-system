@@ -25,7 +25,7 @@ class EmailClient:
             self.connection.login(self.email_address, self.email_password)
             print("Conectado al servidor IMAP exitosamente.")
         except imaplib.IMAP4.error as e:
-            print("Error al conectar al servidor IMAP: " + str(e))
+            print(f"Error al conectar al servidor IMAP: {e}")
             raise
 
         # Conexión al servidor SMTP
@@ -34,7 +34,7 @@ class EmailClient:
             self.smtp_connection.login(self.email_address, self.email_password)
             print("Conectado al servidor SMTP exitosamente.")
         except smtplib.SMTPException as e:
-            print("Error al conectar al servidor SMTP: " + str(e))
+            print(f"Error al conectar al servidor SMTP: {e}")
             raise
 
     def reconnect_imap(self):
@@ -56,7 +56,7 @@ class EmailClient:
             self.smtp_connection.login(self.email_address, self.email_password)
             print("Reconectado al servidor SMTP exitosamente.")
         except smtplib.SMTPException as e:
-            print("Error al reconectar al servidor SMTP: " + str(e))
+            print(f"Error al reconectar al servidor SMTP: {e}")
             raise
 
     def close_connection(self):
@@ -65,13 +65,13 @@ class EmailClient:
                 self.connection.logout()
                 print("Desconectado del servidor IMAP.")
             except imaplib.IMAP4.error as e:
-                print("Error al cerrar la conexión IMAP: " + str(e))
+                print(f"Error al cerrar la conexión IMAP: {e}")
         if self.smtp_connection:
             try:
                 self.smtp_connection.quit()
                 print("Desconectado del servidor SMTP.")
             except smtplib.SMTPException as e:
-                print("Error al cerrar la conexión SMTP: " + str(e))
+                print(f"Error al cerrar la conexión SMTP: {e}")
 
     def fetch_emails(self):
         try:
@@ -81,7 +81,7 @@ class EmailClient:
                 print("Error al buscar correos no leídos.")
                 return []
         except imaplib.IMAP4.error as e:
-            print("Error al buscar correos: " + str(e))
+            print(f"Error al buscar correos: {e}")
             print("Intentando reconectar al servidor IMAP.")
             self.reconnect_imap()
             return []
@@ -94,9 +94,9 @@ class EmailClient:
                     msg = email.message_from_bytes(msg_data[0][1])
                     emails.append((num.decode(), msg, 'INBOX'))
                 else:
-                    print("Error al obtener el correo UID " + num.decode() + ".")
+                    print(f"Error al obtener el correo UID {num.decode()}.")
             except imaplib.IMAP4.error as e:
-                print("Error al obtener el correo UID " + num.decode() + ": " + str(e))
+                print(f"Error al obtener el correo UID {num.decode()}: {e}")
         return emails
 
     def send_email(self, to_email, subject, body, in_reply_to=None, references=None, max_retries=3):
@@ -114,11 +114,11 @@ class EmailClient:
         for attempt in range(max_retries):
             try:
                 self.smtp_connection.send_message(msg)
-                print("Correo enviado a " + to_email)
+                print(f"Correo enviado a {to_email}")
                 return
             except smtplib.SMTPException as e:
-                print("Error al enviar correo a " + to_email + ": " + str(e))
+                print(f"Error al enviar correo a {to_email}: {e}")
                 print("Intentando reconectar al servidor SMTP.")
                 self.reconnect_smtp()
                 time.sleep(5)
-        print("No se pudo enviar el correo a " + to_email + " después de varios intentos.")
+        print(f"No se pudo enviar el correo a {to_email} después de varios intentos.")
