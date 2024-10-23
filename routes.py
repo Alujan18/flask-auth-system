@@ -63,14 +63,17 @@ def register():
                 flash('Username already exists', 'danger')
                 return redirect(url_for('register'))
 
+            # First validate passwords match
             if password != confirm_password:
                 flash('Passwords do not match', 'danger')
                 return redirect(url_for('register'))
 
+            # Then validate password complexity
             if not User.is_valid_password(password):
                 flash('Password must be at least 8 characters long and contain uppercase, lowercase, number, and special character', 'danger')
                 return redirect(url_for('register'))
 
+            # Finally create user and set password
             user = User(username=username)
             user.set_password(password)
             db.session.add(user)
