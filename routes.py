@@ -314,3 +314,14 @@ def agente_logs():
 @app.route('/agente/dashboard')
 def agente_dashboard():
     return render_template('agente_dashboard.html', bot_running=bot_running)
+
+@app.route('/agente/database')
+def agente_database():
+    # Get all threads with their messages
+    threads = EmailThread.query.all()
+    messages = EmailMessage.query.all()
+    
+    # Get log entries
+    logs = Log.query.order_by(Log.timestamp.desc()).limit(10).all()
+    
+    return render_template('agente_database.html', threads=threads, messages=messages, logs=logs)

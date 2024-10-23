@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block content %}
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('agente_dashboard') }}">
+            <i class="bi bi-speedometer2 me-2"></i>Dashboard
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('agente_configuracion') }}">
+            <i class="bi bi-gear me-2"></i>Configuración
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('agente_logs') }}">
+            <i class="bi bi-journals me-2"></i>Logs
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link active" href="{{ url_for('agente_database') }}">
+            <i class="bi bi-database me-2"></i>Database
+        </a>
+    </li>
+</ul>
+
+<div class="row">
+    <!-- Email Threads -->
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Email Threads</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Thread ID</th>
+                                <th>Subject</th>
+                                <th>Last Updated</th>
+                                <th>Messages</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for thread in threads %}
+                            <tr>
+                                <td>{{ thread.id }}</td>
+                                <td>{{ thread.thread_id }}</td>
+                                <td>{{ thread.subject }}</td>
+                                <td>{{ thread.last_updated }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary" type="button" 
+                                            data-bs-toggle="collapse" 
+                                            data-bs-target="#messages-{{ thread.id }}">
+                                        Show Messages
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="5" class="p-0">
+                                    <div class="collapse" id="messages-{{ thread.id }}">
+                                        <div class="p-3 bg-light">
+                                            <table class="table table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>From</th>
+                                                        <th>Subject</th>
+                                                        <th>Date</th>
+                                                        <th>Message ID</th>
+                                                        <th>In Reply To</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for message in messages if message.thread_id == thread.thread_id %}
+                                                    <tr>
+                                                        <td>{{ message.from_name }} &lt;{{ message.from_email }}&gt;</td>
+                                                        <td>{{ message.subject }}</td>
+                                                        <td>{{ message.date }}</td>
+                                                        <td>{{ message.message_id }}</td>
+                                                        <td>{{ message.in_reply_to or 'N/A' }}</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
