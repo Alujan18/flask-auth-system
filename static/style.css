@@ -12,3 +12,8 @@
     color: var(--bs-light);
     border-color: var(--bs-primary);
 }
+
+.dropdown-menu {
+    margin-top: 0;
+    border-radius: 0.375rem;
+}
