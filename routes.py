@@ -13,6 +13,7 @@ import time
 import uuid
 import json
 from sqlalchemy.exc import SQLAlchemyError
+import traceback
 
 # Load environment variables
 load_dotenv()
@@ -21,6 +22,7 @@ load_dotenv()
 email_bot_thread = None
 bot_running = False
 email_client = None
+bot_lock = threading.Lock()
 
 def load_email_config():
     """Load email configuration from environment variables"""
@@ -54,6 +56,11 @@ def add_log(level, message):
             db.session.commit()
     except Exception as e:
         print(f"Error adding log: {str(e)}")
+        # Try to rollback if possible
+        try:
+            db.session.rollback()
+        except:
+            pass
 
 def process_emails(emails):
     """Process incoming emails and store them in the database"""
@@ -134,7 +141,7 @@ def process_emails(emails):
                     db.session.add(email_msg)
                     db.session.commit()
 
-                    add_log('INFO', f'''
+                    add_log('INFO', f'''Nuevo email procesado:
 Thread ID: {thread_id}
 De: {from_name} <{from_email}>
 Fecha: {date_str}
@@ -151,7 +158,8 @@ In-Reply-To: {in_reply_to or 'N/A'}
                     continue
                 except Exception as e:
                     db.session.rollback()
-                    raise
+                    add_log('ERROR', f'Unexpected error processing email {message_id}: {str(e)}')
+                    continue
 
             except Exception as e:
                 add_log('ERROR', f'Error processing email {email_id}: {str(e)}')
@@ -161,53 +169,54 @@ def bot_process():
     """Email bot process that runs in the background"""
     global bot_running, email_client
     
-    add_log('INFO', 'Bot iniciado')
-    connection_retry_count = 0
-    max_retries = 3
-    
-    while bot_running:
-        try:
-            if not email_client:
-                email_client = EmailClient()
-                try:
-                    email_client.connect()
-                    add_log('SUCCESS', 'Conexión establecida con el servidor de correo')
-                    connection_retry_count = 0
-                except Exception as e:
-                    connection_retry_count += 1
-                    add_log('ERROR', f'Error de conexión (intento {connection_retry_count}): {str(e)}')
-                    if connection_retry_count >= max_retries:
-                        add_log('ERROR', 'Número máximo de intentos de conexión alcanzado')
-                        bot_running = False
-                        break
-                    time.sleep(60)  # Wait before retry
-                    continue
-            
-            # Fetch and process emails
-            emails = email_client.fetch_emails()
-            if emails:
-                process_emails(emails)
-            
-            time.sleep(60)  # Check emails every minute
-            
-        except Exception as e:
-            add_log('ERROR', f'Error en el bot: {str(e)}')
-            if email_client:
-                try:
-                    email_client.close_connection()
-                    add_log('WARNING', 'Conexión cerrada debido a error')
-                except:
-                    pass
-            email_client = None
-            time.sleep(60)  # Wait before retrying
-    
-    if email_client:
-        try:
-            email_client.close_connection()
-            add_log('INFO', 'Conexión cerrada correctamente')
-        except Exception as e:
-            add_log('ERROR', f'Error al cerrar la conexión: {str(e)}')
-    add_log('INFO', 'Bot detenido')
+    with bot_lock:
+        add_log('INFO', 'Bot iniciado')
+        connection_retry_count = 0
+        max_retries = 3
+        
+        while bot_running:
+            try:
+                if not email_client:
+                    email_client = EmailClient()
+                    try:
+                        email_client.connect()
+                        add_log('SUCCESS', 'Conexión establecida con el servidor de correo')
+                        connection_retry_count = 0
+                    except Exception as e:
+                        connection_retry_count += 1
+                        add_log('ERROR', f'Error de conexión (intento {connection_retry_count}): {str(e)}')
+                        if connection_retry_count >= max_retries:
+                            add_log('ERROR', 'Número máximo de intentos de conexión alcanzado')
+                            bot_running = False
+                            break
+                        time.sleep(60)  # Wait before retry
+                        continue
+                
+                # Fetch and process emails
+                emails = email_client.fetch_emails()
+                if emails:
+                    process_emails(emails)
+                
+                time.sleep(60)  # Check emails every minute
+                
+            except Exception as e:
+                add_log('ERROR', f'Error en el bot: {str(e)}\n{traceback.format_exc()}')
+                if email_client:
+                    try:
+                        email_client.close_connection()
+                        add_log('WARNING', 'Conexión cerrada debido a error')
+                    except:
+                        pass
+                email_client = None
+                time.sleep(60)  # Wait before retrying
+        
+        if email_client:
+            try:
+                email_client.close_connection()
+                add_log('INFO', 'Conexión cerrada correctamente')
+            except Exception as e:
+                add_log('ERROR', f'Error al cerrar la conexión: {str(e)}')
+        add_log('INFO', 'Bot detenido')
 
 @app.route('/')
 def index():
@@ -293,27 +302,28 @@ def toggle_bot():
     global bot_running, email_bot_thread
     
     try:
-        if not bot_running:
-            # Check if configuration exists
-            config = load_email_config()
-            if not all(config.values()):
-                return jsonify({
-                    'status': 'error',
-                    'message': 'Configure los datos del servidor de correo primero'
-                })
-            
-            # Start bot
-            bot_running = True
-            email_bot_thread = threading.Thread(target=bot_process)
-            email_bot_thread.daemon = True
-            email_bot_thread.start()
-            return jsonify({'status': 'success', 'message': 'Bot iniciado', 'running': True})
-        else:
-            # Stop bot
-            bot_running = False
-            if email_bot_thread:
-                email_bot_thread.join(timeout=2)
-            return jsonify({'status': 'success', 'message': 'Bot detenido', 'running': False})
+        with bot_lock:
+            if not bot_running:
+                # Check if configuration exists
+                config = load_email_config()
+                if not all(config.values()):
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'Configure los datos del servidor de correo primero'
+                    })
+                
+                # Start bot
+                bot_running = True
+                email_bot_thread = threading.Thread(target=bot_process)
+                email_bot_thread.daemon = True
+                email_bot_thread.start()
+                return jsonify({'status': 'success', 'message': 'Bot iniciado', 'running': True})
+            else:
+                # Stop bot
+                bot_running = False
+                if email_bot_thread:
+                    email_bot_thread.join(timeout=2)
+                return jsonify({'status': 'success', 'message': 'Bot detenido', 'running': False})
     except Exception as e:
         return jsonify({'status': 'error', 'message': f'Error: {str(e)}'})
 
@@ -333,7 +343,7 @@ def agente_logs():
 
 @app.route('/agente/dashboard')
 def agente_dashboard():
-    return render_template('agente_dashboard.html', bot_running=bot_running)
+    return render_template('agente_dashboard.html')
 
 @app.route('/agente/database')
 def agente_database():
