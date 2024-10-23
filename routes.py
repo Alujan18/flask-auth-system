@@ -317,11 +317,28 @@ def agente_dashboard():
 
 @app.route('/agente/database')
 def agente_database():
-    # Get all threads with their messages
-    threads = EmailThread.query.all()
-    messages = EmailMessage.query.all()
+    # Get all unique senders
+    senders = db.session.query(EmailMessage.from_email, EmailMessage.from_name).distinct().all()
     
-    # Get log entries
-    logs = Log.query.order_by(Log.timestamp.desc()).limit(10).all()
+    # For each sender, get their threads and messages
+    sender_data = []
+    for from_email, from_name in senders:
+        # Get all threads where this person is a sender
+        thread_ids = db.session.query(EmailMessage.thread_id)\
+            .filter(EmailMessage.from_email == from_email)\
+            .distinct().all()
+        thread_ids = [t[0] for t in thread_ids]
+        
+        # Get all threads and their messages
+        threads = EmailThread.query.filter(EmailThread.thread_id.in_(thread_ids)).all()
+        messages = EmailMessage.query.filter(EmailMessage.thread_id.in_(thread_ids))\
+            .order_by(EmailMessage.date.desc()).all()
+            
+        sender_data.append({
+            'email': from_email,
+            'name': from_name,
+            'threads': threads,
+            'messages': messages
+        })
     
-    return render_template('agente_database.html', threads=threads, messages=messages, logs=logs)
+    return render_template('agente_database.html', sender_data=sender_data)

@@ -25,75 +25,75 @@
 </ul>
 
 <div class="row">
-    <!-- Email Threads -->
-    <div class="col-12 mb-4">
-        <div class="card">
+    <!-- Email Senders -->
+    <div class="col-12">
+        {% for sender in sender_data %}
+        <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">Email Threads</h5>
+                <h5 class="mb-0">
+                    <i class="bi bi-person-circle me-2"></i>
+                    {{ sender.name }} &lt;{{ sender.email }}&gt;
+                </h5>
             </div>
             <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Thread ID</th>
-                                <th>Subject</th>
-                                <th>Last Updated</th>
-                                <th>Messages</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for thread in threads %}
-                            <tr>
-                                <td>{{ thread.id }}</td>
-                                <td>{{ thread.thread_id }}</td>
-                                <td>{{ thread.subject }}</td>
-                                <td>{{ thread.last_updated }}</td>
-                                <td>
-                                    <button class="btn btn-sm btn-primary" type="button" 
-                                            data-bs-toggle="collapse" 
-                                            data-bs-target="#messages-{{ thread.id }}">
-                                        Show Messages
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td colspan="5" class="p-0">
-                                    <div class="collapse" id="messages-{{ thread.id }}">
-                                        <div class="p-3 bg-light">
-                                            <table class="table table-sm">
-                                                <thead>
-                                                    <tr>
-                                                        <th>From</th>
-                                                        <th>Subject</th>
-                                                        <th>Date</th>
-                                                        <th>Message ID</th>
-                                                        <th>In Reply To</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {% for message in messages if message.thread_id == thread.thread_id %}
-                                                    <tr>
-                                                        <td>{{ message.from_name }} &lt;{{ message.from_email }}&gt;</td>
-                                                        <td>{{ message.subject }}</td>
-                                                        <td>{{ message.date }}</td>
-                                                        <td>{{ message.message_id }}</td>
-                                                        <td>{{ message.in_reply_to or 'N/A' }}</td>
-                                                    </tr>
-                                                    {% endfor %}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="accordion" id="sender-{{ loop.index }}">
+                    {% for thread in sender.threads %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" 
+                                    data-bs-toggle="collapse" 
+                                    data-bs-target="#thread-{{ thread.id }}">
+                                {{ thread.subject or 'Sin Asunto' }}
+                                <small class="text-muted ms-2">
+                                    ({{ thread.last_updated.strftime('%Y-%m-%d %H:%M:%S') }})
+                                </small>
+                            </button>
+                        </h2>
+                        <div id="thread-{{ thread.id }}" class="accordion-collapse collapse" 
+                             data-bs-parent="#sender-{{ loop.index }}">
+                            <div class="accordion-body">
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>From</th>
+                                                <th>Date</th>
+                                                <th>Subject</th>
+                                                <th>Body</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for message in sender.messages if message.thread_id == thread.thread_id %}
+                                            <tr>
+                                                <td>{{ message.from_name }} &lt;{{ message.from_email }}&gt;</td>
+                                                <td>{{ message.date.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                                <td>{{ message.subject }}</td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-primary" 
+                                                            type="button" 
+                                                            data-bs-toggle="collapse" 
+                                                            data-bs-target="#body-{{ message.id }}">
+                                                        Show Content
+                                                    </button>
+                                                    <div class="collapse mt-2" id="body-{{ message.id }}">
+                                                        <div class="card card-body">
+                                                            <pre class="mb-0">{{ message.body }}</pre>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
         </div>
+        {% endfor %}
     </div>
 </div>
 {% endblock %}
