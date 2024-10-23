@@ -19,7 +19,126 @@
         <h4 class="mb-0">Configuración</h4>
     </div>
     <div class="card-body">
-        <p>Página de configuración del Agente IA.</p>
+        <form method="POST" class="needs-validation" novalidate>
+            <!-- IMAP Configuration -->
+            <div class="mb-4">
+                <h5 class="mb-3">Configuración IMAP</h5>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="imap_server" class="form-label">Servidor IMAP</label>
+                        <input type="text" class="form-control" id="imap_server" name="imap_server" 
+                               value="{{ config.get('IMAP_SERVER', '') }}" required>
+                        <div class="invalid-feedback">
+                            Por favor ingrese el servidor IMAP.
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="imap_port" class="form-label">Puerto IMAP</label>
+                        <input type="number" class="form-control" id="imap_port" name="imap_port" 
+                               value="{{ config.get('IMAP_PORT', '') }}" required>
+                        <div class="invalid-feedback">
+                            Por favor ingrese el puerto IMAP.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SMTP Configuration -->
+            <div class="mb-4">
+                <h5 class="mb-3">Configuración SMTP</h5>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="smtp_server" class="form-label">Servidor SMTP</label>
+                        <input type="text" class="form-control" id="smtp_server" name="smtp_server" 
+                               value="{{ config.get('SMTP_SERVER', '') }}" required>
+                        <div class="invalid-feedback">
+                            Por favor ingrese el servidor SMTP.
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="smtp_port" class="form-label">Puerto SMTP</label>
+                        <input type="number" class="form-control" id="smtp_port" name="smtp_port" 
+                               value="{{ config.get('SMTP_PORT', '') }}" required>
+                        <div class="invalid-feedback">
+                            Por favor ingrese el puerto SMTP.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Email Credentials -->
+            <div class="mb-4">
+                <h5 class="mb-3">Credenciales de Email</h5>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="email_address" class="form-label">Dirección de Email</label>
+                        <input type="email" class="form-control" id="email_address" name="email_address" 
+                               value="{{ config.get('EMAIL_ADDRESS', '') }}" required>
+                        <div class="invalid-feedback">
+                            Por favor ingrese una dirección de email válida.
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="email_password" class="form-label">Contraseña</label>
+                        <input type="password" class="form-control" id="email_password" name="email_password" 
+                               value="{{ config.get('EMAIL_PASSWORD', '') }}" required>
+                        <div class="invalid-feedback">
+                            Por favor ingrese la contraseña del email.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-secondary" id="test-connection">
+                    <i class="bi bi-lightning me-2"></i>Probar Conexión
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save me-2"></i>Guardar Configuración
+                </button>
+            </div>
+        </form>
     </div>
 </div>
+
+<!-- Form validation script -->
+<script>
+(function () {
+    'use strict'
+    var forms = document.querySelectorAll('.needs-validation')
+    Array.prototype.slice.call(forms).forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            if (!form.checkValidity()) {
+                event.preventDefault()
+                event.stopPropagation()
+            }
+            form.classList.add('was-validated')
+        }, false)
+    })
+})()
+
+// Test connection functionality
+document.getElementById('test-connection').addEventListener('click', async () => {
+    try {
+        const response = await fetch('/agente/test-connection', {
+            method: 'POST',
+        });
+        const data = await response.json();
+        
+        const alertClass = data.status === 'success' ? 'success' : 'danger';
+        const alertHTML = `
+            <div class="alert alert-${alertClass} alert-dismissible fade show">
+                ${data.message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        
+        // Insert alert before the form
+        const form = document.querySelector('form');
+        form.insertAdjacentHTML('beforebegin', alertHTML);
+    } catch (error) {
+        console.error('Error:', error);
+    }
+});
+</script>
 {% endblock %}
