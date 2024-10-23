@@ -6,12 +6,12 @@ from pathlib import Path
 from email_client import EmailClient
 from models import Log, EmailThread, EmailMessage
 from datetime import datetime
+from email.utils import parseaddr, parsedate_to_datetime
+from email_utils import decode_str, get_email_body
 import threading
 import time
 import uuid
 import json
-from email.utils import parseaddr, parsedate_to_datetime
-from email_utils import decode_str, get_email_body
 
 # Load environment variables
 load_dotenv()
@@ -65,6 +65,11 @@ def process_emails(emails):
                 from_email = decode_str(email_addr)
                 subject = decode_str(msg.get("Subject"))
                 message_id = msg.get("Message-ID")
+                
+                # Generate UUID for empty message_id
+                if not message_id:
+                    message_id = f"<{str(uuid.uuid4())}@generated>"
+                
                 in_reply_to = msg.get("In-Reply-To")
                 references = msg.get("References", "").split()
                 date_str = msg.get("Date")
@@ -79,6 +84,12 @@ def process_emails(emails):
                 try:
                     # Start a new transaction
                     db.session.begin_nested()
+
+                    # Find existing message first to avoid duplicates
+                    existing_message = EmailMessage.query.filter_by(message_id=message_id).first()
+                    if existing_message:
+                        add_log('WARNING', f'Email with message_id {message_id} already exists, skipping')
+                        continue
 
                     # Find or create thread first
                     thread_id = None
@@ -98,7 +109,7 @@ def process_emails(emails):
                         thread_id = str(uuid.uuid4())
                         thread = EmailThread(thread_id=thread_id, subject=subject)
                         db.session.add(thread)
-                        db.session.flush()  # Ensure thread is saved before adding message
+                        db.session.flush()
                     
                     # Now create the email message
                     email_msg = EmailMessage(
@@ -113,30 +124,26 @@ def process_emails(emails):
                         references=json.dumps(references)
                     )
                     db.session.add(email_msg)
-                    
-                    # Commit the nested transaction
                     db.session.commit()
 
-                    # Log success
                     add_log('INFO', f'''
 Thread ID: {thread_id}
 De: {from_name} <{from_email}>
 Fecha: {date_str}
 Asunto: {subject}
-Message-ID: {message_id or 'N/A'}
+Message-ID: {message_id}
 In-Reply-To: {in_reply_to or 'N/A'}
 ----------------------------------------
 {body[:50] + '...' if len(body) > 50 else body}
 ''')
 
                 except Exception as e:
-                    # Rollback the nested transaction if there's an error
                     db.session.rollback()
                     raise
 
             except Exception as e:
                 add_log('ERROR', f'Error procesando email {email_id}: {str(e)}')
-                continue  # Continue with next email even if this one fails
+                continue
 
 def bot_process():
     """Email bot process that runs in the background"""
