@@ -100,6 +100,9 @@
             </div>
 
             <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-danger" id="clear-database">
+                    <i class="bi bi-trash me-2"></i>Limpiar Base de Datos
+                </button>
                 <button type="button" class="btn btn-secondary" id="test-connection">
                     <i class="bi bi-lightning me-2"></i>Probar Conexión
                 </button>
@@ -152,6 +155,31 @@ document.getElementById('test-connection').addEventListener('click', async () =>
         form.insertAdjacentHTML('beforebegin', alertHTML);
     } catch (error) {
         console.error('Error:', error);
+    }
+});
+
+// Clear database functionality
+document.getElementById('clear-database').addEventListener('click', async () => {
+    if (confirm('¿Está seguro que desea limpiar la base de datos? Esta acción no se puede deshacer.')) {
+        try {
+            const response = await fetch('/agente/clear-database', {
+                method: 'POST'
+            });
+            const data = await response.json();
+            
+            const alertClass = data.status === 'success' ? 'success' : 'danger';
+            const alertHTML = `
+                <div class="alert alert-${alertClass} alert-dismissible fade show">
+                    ${data.message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            
+            const form = document.querySelector('form');
+            form.insertAdjacentHTML('beforebegin', alertHTML);
+        } catch (error) {
+            console.error('Error:', error);
+        }
     }
 });
 </script>

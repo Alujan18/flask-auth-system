@@ -256,8 +256,8 @@ def agente_configuracion():
             return render_template('agente_configuracion.html', config=config_data)
         
         try:
-            imap_port = int(config_data['IMAP_PORT'])
-            smtp_port = int(config_data['SMTP_PORT'])
+            imap_port = int(config_data['IMAP_PORT'] or 0)
+            smtp_port = int(config_data['SMTP_PORT'] or 0)
             if not (0 <= imap_port <= 65535 and 0 <= smtp_port <= 65535):
                 raise ValueError("Puerto inválido")
         except ValueError:
@@ -285,6 +285,31 @@ def test_connection():
         return jsonify({'status': 'success', 'message': 'Conexión exitosa a IMAP y SMTP'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': f'Error de conexión: {str(e)}'})
+
+@app.route('/agente/clear-database', methods=['POST'])
+def clear_database():
+    try:
+        # Stop bot if running
+        global bot_running
+        bot_running = False
+        
+        # Drop and recreate all tables
+        db.drop_all()
+        db.create_all()
+        
+        # Add success log
+        add_log('INFO', 'Base de datos limpiada exitosamente')
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Base de datos limpiada exitosamente'
+        })
+    except Exception as e:
+        app.logger.error(f'Error clearing database: {str(e)}')
+        return jsonify({
+            'status': 'error',
+            'message': f'Error al limpiar la base de datos: {str(e)}'
+        }), 500
 
 @app.route('/agente/bot/toggle', methods=['POST'])
 def toggle_bot():
@@ -326,6 +351,27 @@ def agente_logs():
         app.logger.error(f'Error fetching logs: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
+@app.route('/agente/logs/latest')
+def latest_logs():
+    try:
+        logs = Log.query.order_by(Log.timestamp.desc()).limit(5).all()
+        return jsonify({
+            'status': 'success',
+            'logs': [{
+                'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                'level': log.level,
+                'level_class': log.level_class,
+                'message': log.message
+            } for log in logs]
+        })
+    except Exception as e:
+        app.logger.error(f'Error fetching latest logs: {str(e)}')
+        return jsonify({
+            'status': 'error',
+            'message': 'Error al cargar los registros',
+            'logs': []
+        }), 500
+
 @app.route('/agente/dashboard')
 def agente_dashboard():
     return render_template('agente_dashboard.html')
@@ -354,24 +400,3 @@ def agente_database():
         app.logger.error(f'Error in agente_database: {str(e)}')
         flash(f'Error al cargar los datos: {str(e)}', 'danger')
         return render_template('agente_database.html', thread_data=[])
-
-@app.route('/agente/logs/latest')
-def latest_logs():
-    try:
-        logs = Log.query.order_by(Log.timestamp.desc()).limit(5).all()
-        return jsonify({
-            'status': 'success',
-            'logs': [{
-                'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                'level': log.level,
-                'level_class': log.level_class,
-                'message': log.message
-            } for log in logs]
-        })
-    except Exception as e:
-        app.logger.error(f'Error fetching latest logs: {str(e)}')
-        return jsonify({
-            'status': 'error',
-            'message': 'Error al cargar los registros',
-            'logs': []
-        }), 500
