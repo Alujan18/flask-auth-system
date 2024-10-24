@@ -399,13 +399,26 @@ def agente_database():
             if threads:
                 thread_data = []
                 for thread in threads:
-                    # Get all messages in this thread with simple date ordering
+                    # Get all messages in this thread with proper filtering
                     messages = EmailMessage.query.filter(
                         EmailMessage.thread_id == thread.thread_id,
                         or_(
                             EmailMessage.from_email == from_email,
                             EmailMessage.folder == 'Sent'
                         )
+                    ).group_by(
+                        EmailMessage.message_id,
+                        EmailMessage.id,
+                        EmailMessage.thread_id,
+                        EmailMessage.from_name,
+                        EmailMessage.from_email,
+                        EmailMessage.subject,
+                        EmailMessage.body,
+                        EmailMessage.date,
+                        EmailMessage.in_reply_to,
+                        EmailMessage.references,
+                        EmailMessage.folder,
+                        EmailMessage.reply_by_ia
                     ).order_by(
                         EmailMessage.date.asc()
                     ).all()
