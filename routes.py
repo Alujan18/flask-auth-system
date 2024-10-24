@@ -378,25 +378,31 @@ def agente_database():
         
         sender_data = []
         for from_email, from_name in senders:
-            # Get all emails where this person is either sender or recipient
-            messages = EmailMessage.query.filter(
-                or_(
-                    EmailMessage.from_email == from_email,
-                    EmailMessage.folder == 'Sent'
-                )
-            ).order_by(EmailMessage.date.desc()).all()
+            # Get all threads where this person is involved
+            threads = db.session.query(EmailThread).join(
+                EmailMessage,
+                EmailThread.thread_id == EmailMessage.thread_id
+            ).filter(
+                EmailMessage.from_email == from_email
+            ).distinct().order_by(EmailThread.last_updated.desc()).all()
             
-            if messages:
-                thread_ids = set(msg.thread_id for msg in messages)
-                threads = EmailThread.query.filter(
-                    EmailThread.thread_id.in_(thread_ids)
-                ).all()
+            if threads:
+                thread_data = []
+                for thread in threads:
+                    # Get all messages in this thread
+                    messages = EmailMessage.query.filter(
+                        EmailMessage.thread_id == thread.thread_id
+                    ).order_by(EmailMessage.date.asc()).all()
+                    
+                    thread_data.append({
+                        'thread': thread,
+                        'messages': messages
+                    })
                 
                 sender_data.append({
                     'email': from_email,
                     'name': from_name or from_email,
-                    'threads': threads,
-                    'messages': messages
+                    'threads': thread_data
                 })
         
         return render_template('agente_database.html', sender_data=sender_data)
