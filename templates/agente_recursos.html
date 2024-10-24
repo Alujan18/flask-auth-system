@@ -46,9 +46,16 @@
                         <i class="bi bi-upload me-2"></i>Subir Prompt
                     </button>
                 </form>
-                <div class="mt-4" id="prompt-preview">
-                    <!-- Preview content will be displayed here -->
-                </div>
+                
+                <!-- Existing Files -->
+                {% if prompt_files %}
+                    {% for file in prompt_files %}
+                    <div class="mt-4">
+                        <h6 class="mb-2">{{ file.name }}</h6>
+                        <pre class="bg-light p-3 rounded" style="max-height: 300px; overflow-y: auto;">{{ file.content }}</pre>
+                    </div>
+                    {% endfor %}
+                {% endif %}
             </div>
         </div>
     </div>
@@ -69,9 +76,16 @@
                         <i class="bi bi-upload me-2"></i>Subir Info
                     </button>
                 </form>
-                <div class="mt-4" id="info-preview">
-                    <!-- Preview content will be displayed here -->
-                </div>
+                
+                <!-- Existing Files -->
+                {% if info_files %}
+                    {% for file in info_files %}
+                    <div class="mt-4">
+                        <h6 class="mb-2">{{ file.name }}</h6>
+                        <pre class="bg-light p-3 rounded" style="max-height: 300px; overflow-y: auto;">{{ file.content }}</pre>
+                    </div>
+                    {% endfor %}
+                {% endif %}
             </div>
         </div>
     </div>

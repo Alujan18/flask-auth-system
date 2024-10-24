@@ -26,12 +26,12 @@ email_client = None
 bot_lock = threading.Lock()
 
 # Upload configuration
-UPLOAD_FOLDER = 'uploads'
+AGENTE_IA_FOLDER = 'agente_ia'
 ALLOWED_EXTENSIONS = {'txt'}
 
 # Create uploads directory if it doesn't exist
-os.makedirs(os.path.join(app.root_path, UPLOAD_FOLDER, 'prompt'), exist_ok=True)
-os.makedirs(os.path.join(app.root_path, UPLOAD_FOLDER, 'info'), exist_ok=True)
+os.makedirs(os.path.join(app.root_path, AGENTE_IA_FOLDER, 'prompt'), exist_ok=True)
+os.makedirs(os.path.join(app.root_path, AGENTE_IA_FOLDER, 'info'), exist_ok=True)
 
 def allowed_file(filename):
     if filename is None:
@@ -82,6 +82,16 @@ def add_log(level, message):
             db.session.rollback()
         except:
             pass
+
+def read_file_content(file_type, filename):
+    try:
+        file_path = os.path.join(app.root_path, AGENTE_IA_FOLDER, file_type, filename)
+        if os.path.exists(file_path):
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
+    except Exception as e:
+        app.logger.error(f'Error reading {file_type} file: {str(e)}')
+    return None
 
 def process_emails(emails):
     """Process incoming emails and store them in the database"""
@@ -465,7 +475,36 @@ def agente_database():
 
 @app.route('/agente/recursos')
 def agente_recursos():
-    return render_template('agente_recursos.html')
+    # Get list of files and their contents
+    prompt_files = []
+    info_files = []
+    
+    prompt_dir = os.path.join(app.root_path, AGENTE_IA_FOLDER, 'prompt')
+    info_dir = os.path.join(app.root_path, AGENTE_IA_FOLDER, 'info')
+    
+    if os.path.exists(prompt_dir):
+        for filename in os.listdir(prompt_dir):
+            if filename.endswith('.txt'):
+                content = read_file_content('prompt', filename)
+                if content:
+                    prompt_files.append({
+                        'name': filename,
+                        'content': content[:1000] + '...' if len(content) > 1000 else content
+                    })
+    
+    if os.path.exists(info_dir):
+        for filename in os.listdir(info_dir):
+            if filename.endswith('.txt'):
+                content = read_file_content('info', filename)
+                if content:
+                    info_files.append({
+                        'name': filename,
+                        'content': content[:1000] + '...' if len(content) > 1000 else content
+                    })
+    
+    return render_template('agente_recursos.html', 
+                         prompt_files=prompt_files,
+                         info_files=info_files)
 
 @app.route('/agente/upload/prompt', methods=['POST'])
 def upload_prompt():
@@ -486,11 +525,12 @@ def handle_upload(upload_type):
         return redirect(url_for('agente_recursos'))
     
     if allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(app.root_path, UPLOAD_FOLDER, upload_type, filename)
-        file.save(file_path)
-        flash(f'File uploaded successfully to {upload_type}', 'success')
-        add_log('SUCCESS', f'File {filename} uploaded to {upload_type} directory')
+        if file.filename:
+            filename = secure_filename(file.filename)
+            file_path = os.path.join(app.root_path, AGENTE_IA_FOLDER, upload_type, filename)
+            file.save(file_path)
+            flash(f'File uploaded successfully', 'success')
+            add_log('SUCCESS', f'File {filename} uploaded to {upload_type} directory')
     else:
         flash('Invalid file type. Only .txt files are allowed.', 'danger')
         add_log('ERROR', f'Invalid file upload attempt to {upload_type} directory')
