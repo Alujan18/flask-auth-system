@@ -9,12 +9,6 @@ class Log(db.Model):
     level = db.Column(db.String(20), nullable=False)  # 'INFO', 'ERROR', etc.
     message = db.Column(db.Text, nullable=False)
 
-    def __init__(self, level=None, message=None):
-        super().__init__()
-        self.level = level
-        self.message = message
-        self.timestamp = datetime.utcnow()
-
     @property
     def level_class(self):
         return {
@@ -32,13 +26,6 @@ class EmailThread(db.Model):
     last_updated = db.Column(db.DateTime, default=datetime.utcnow)
     reply_by_ia = db.Column(db.Boolean, nullable=False, default=False)
 
-    def __init__(self, thread_id=None, subject=None):
-        super().__init__()
-        self.thread_id = thread_id
-        self.subject = subject
-        self.last_updated = datetime.utcnow()
-        self.reply_by_ia = False
-
 class EmailMessage(db.Model):
     __tablename__ = 'email_message'
     id = db.Column(db.Integer, primary_key=True)
@@ -53,10 +40,3 @@ class EmailMessage(db.Model):
     references = db.Column(db.Text)  # Store as JSON string
     folder = db.Column(db.String(50), nullable=False, default='INBOX')
     reply_by_ia = db.Column(db.Boolean, nullable=False, default=False)
-
-    def __init__(self, **kwargs):
-        super().__init__()
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-        if not self.date:
-            self.date = datetime.utcnow()

@@ -89,7 +89,10 @@ async function toggleBot() {
     
     try {
         const response = await fetch('/agente/bot/toggle', {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
         
         if (!response.ok) {
@@ -121,34 +124,27 @@ async function loadLatestLogs() {
         }
         
         const data = await response.json();
-        
-        if (!data || typeof data !== 'object') {
-            throw new Error('Invalid response format');
+        if (data.status !== 'success') {
+            throw new Error(data.message || 'Error loading logs');
         }
         
         latestLogsContainer.innerHTML = '';
         
-        if (!data.logs || !Array.isArray(data.logs) || data.logs.length === 0) {
-            latestLogsContainer.innerHTML = `
-                <div class="list-group-item text-center text-muted">
-                    <i class="bi bi-info-circle me-2"></i>
-                    No hay registros disponibles
-                </div>`;
+        if (!data.logs || data.logs.length === 0) {
+            const noLogsMessage = document.createElement('div');
+            noLogsMessage.className = 'list-group-item text-center text-muted';
+            noLogsMessage.textContent = 'No hay registros disponibles';
+            latestLogsContainer.appendChild(noLogsMessage);
             return;
         }
         
         data.logs.forEach(log => {
-            if (!log || typeof log !== 'object' || !log.timestamp || !log.level || !log.message) {
-                console.warn('Invalid log entry:', log);
-                return;
-            }
-            
             const logItem = document.createElement('div');
             logItem.className = 'list-group-item';
             logItem.innerHTML = `
                 <div class="d-flex w-100 justify-content-between">
                     <small class="text-muted">${log.timestamp}</small>
-                    <span class="badge bg-${log.level_class || 'secondary'}">${log.level}</span>
+                    <span class="badge bg-${log.level_class}">${log.level}</span>
                 </div>
                 <p class="mb-1">${log.message}</p>
             `;
@@ -159,7 +155,7 @@ async function loadLatestLogs() {
         latestLogsContainer.innerHTML = `
             <div class="list-group-item text-center text-danger">
                 <i class="bi bi-exclamation-triangle me-2"></i>
-                Error al cargar los registros: ${error.message}
+                Error al cargar los registros
             </div>
         `;
     }
