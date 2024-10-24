@@ -89,7 +89,10 @@ async function toggleBot() {
     
     try {
         const response = await fetch('/agente/bot/toggle', {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
         
         if (!response.ok) {
@@ -112,6 +115,8 @@ async function toggleBot() {
 
 // Function to load latest logs
 async function loadLatestLogs() {
+    const latestLogsContainer = document.getElementById('latest-logs');
+    
     try {
         const response = await fetch('/agente/logs/latest');
         if (!response.ok) {
@@ -119,10 +124,13 @@ async function loadLatestLogs() {
         }
         
         const data = await response.json();
-        const latestLogsContainer = document.getElementById('latest-logs');
+        if (data.status !== 'success') {
+            throw new Error(data.message || 'Error loading logs');
+        }
+        
         latestLogsContainer.innerHTML = '';
         
-        if (!data.logs || !data.logs.length) {
+        if (!data.logs || data.logs.length === 0) {
             const noLogsMessage = document.createElement('div');
             noLogsMessage.className = 'list-group-item text-center text-muted';
             noLogsMessage.textContent = 'No hay registros disponibles';
@@ -144,11 +152,12 @@ async function loadLatestLogs() {
         });
     } catch (error) {
         console.error('Error loading logs:', error);
-        const errorMessage = document.createElement('div');
-        errorMessage.className = 'list-group-item text-center text-danger';
-        errorMessage.textContent = 'Error al cargar los registros';
-        document.getElementById('latest-logs').innerHTML = '';
-        document.getElementById('latest-logs').appendChild(errorMessage);
+        latestLogsContainer.innerHTML = `
+            <div class="list-group-item text-center text-danger">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                Error al cargar los registros
+            </div>
+        `;
     }
 }
 
@@ -167,7 +176,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateBotStatus(data.running);
     } catch (error) {
         console.error('Error loading bot status:', error);
-        alert('Error al cargar el estado del bot');
+        const statusBadge = document.getElementById('bot-status');
+        statusBadge.className = 'badge bg-warning';
+        statusBadge.textContent = 'Error';
     }
     
     // Load initial logs

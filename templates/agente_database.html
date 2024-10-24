@@ -71,7 +71,11 @@
                             </div>
                             <div class="ps-3 border-start">
                                 <p class="text-muted mb-2">{{ message.date.strftime('%Y-%m-%d %H:%M:%S') }}</p>
-                                <p class="mb-0">{{ message.body }}</p>
+                                {% if message.folder == 'Sent' %}
+                                    <p class="mb-0">{{ message.body.split('El')[0] if message.body and 'El' in message.body else message.body }}</p>
+                                {% else %}
+                                    <p class="mb-0">{{ message.body }}</p>
+                                {% endif %}
                             </div>
                         </div>
                         {% endfor %}
