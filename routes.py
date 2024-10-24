@@ -123,7 +123,7 @@ def process_emails(emails):
                     thread = EmailThread.query.filter_by(thread_id=thread_id).first()
                     if thread:
                         thread.last_updated = datetime.utcnow()
-                
+
                 email_msg = EmailMessage()
                 email_msg.message_id = message_id
                 email_msg.thread_id = thread_id
@@ -139,16 +139,7 @@ def process_emails(emails):
                 db.session.add(email_msg)
                 db.session.commit()
 
-                add_log('INFO', f'''Nuevo email procesado:
-Thread ID: {thread_id}
-De: {from_name} <{from_email}>
-Fecha: {date_str}
-Asunto: {subject}
-Message-ID: {message_id}
-In-Reply-To: {in_reply_to or 'N/A'}
-----------------------------------------
-{body[:50] + '...' if len(body) > 50 else body}
-''')
+                add_log('INFO', f'Nuevo email procesado:\nThread ID: {thread_id}\nDe: {from_name} <{from_email}>\nFecha: {date_str}\nAsunto: {subject}\nMessage-ID: {message_id}\nIn-Reply-To: {in_reply_to or "N/A"}\n----------------------------------------\n{body[:50] + "..." if len(body) > 50 else body}')
 
             except SQLAlchemyError as e:
                 db.session.rollback()
@@ -379,24 +370,37 @@ def agente_dashboard():
 @app.route('/agente/database')
 def agente_database():
     try:
-        # Get all threads
-        threads = EmailThread.query.order_by(EmailThread.last_updated.desc()).all()
-        thread_data = []
+        # Get all unique senders
+        senders = db.session.query(
+            EmailMessage.from_email, 
+            EmailMessage.from_name
+        ).distinct().all()
         
-        for thread in threads:
-            # Get all messages in this thread
+        sender_data = []
+        for from_email, from_name in senders:
+            # Get all emails where this person is either sender or recipient
             messages = EmailMessage.query.filter(
-                EmailMessage.thread_id == thread.thread_id
-            ).order_by(EmailMessage.date.asc()).all()
+                or_(
+                    EmailMessage.from_email == from_email,
+                    EmailMessage.folder == 'Sent'
+                )
+            ).order_by(EmailMessage.date.desc()).all()
             
             if messages:
-                thread_data.append({
-                    'thread': thread,
+                thread_ids = set(msg.thread_id for msg in messages)
+                threads = EmailThread.query.filter(
+                    EmailThread.thread_id.in_(thread_ids)
+                ).all()
+                
+                sender_data.append({
+                    'email': from_email,
+                    'name': from_name or from_email,
+                    'threads': threads,
                     'messages': messages
                 })
         
-        return render_template('agente_database.html', thread_data=thread_data)
+        return render_template('agente_database.html', sender_data=sender_data)
     except Exception as e:
         app.logger.error(f'Error in agente_database: {str(e)}')
         flash(f'Error al cargar los datos: {str(e)}', 'danger')
-        return render_template('agente_database.html', thread_data=[])
+        return render_template('agente_database.html', sender_data=[])
