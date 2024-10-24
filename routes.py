@@ -121,7 +121,8 @@ def process_emails(emails):
                     db.session.flush()
                 else:
                     thread = EmailThread.query.filter_by(thread_id=thread_id).first()
-                    thread.last_updated = datetime.utcnow()
+                    if thread:
+                        thread.last_updated = datetime.utcnow()
                 
                 email_msg = EmailMessage()
                 email_msg.message_id = message_id
@@ -320,12 +321,7 @@ def bot_status():
 def agente_logs():
     try:
         logs = Log.query.order_by(Log.timestamp.desc()).limit(100).all()
-        return render_template('agente_logs.html', logs=[{
-            'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-            'level': log.level,
-            'level_class': log.level_class,
-            'message': log.message
-        } for log in logs])
+        return render_template('agente_logs.html', logs=logs)
     except SQLAlchemyError as e:
         app.logger.error(f'Error fetching logs: {str(e)}')
         return jsonify({'error': str(e)}), 500
@@ -337,55 +333,45 @@ def agente_dashboard():
 @app.route('/agente/database')
 def agente_database():
     try:
-        senders = db.session.query(
-            EmailMessage.from_email,
-            EmailMessage.from_name
-        ).filter(
-            EmailMessage.folder == 'INBOX'
-        ).distinct().all()
+        # Get all threads
+        threads = EmailThread.query.order_by(EmailThread.last_updated.desc()).all()
+        thread_data = []
         
-        sender_data = []
-        for from_email, from_name in senders:
-            thread_ids = db.session.query(EmailThread.thread_id).distinct().join(
-                EmailMessage,
-                EmailThread.thread_id == EmailMessage.thread_id
-            ).filter(
-                or_(
-                    EmailMessage.from_email == from_email,
-                    and_(
-                        EmailMessage.folder == 'Sent',
-                        EmailMessage.from_email == app.config['EMAIL_ADDRESS']
-                    )
-                )
-            ).all()
+        for thread in threads:
+            # Get all messages in this thread
+            messages = EmailMessage.query.filter(
+                EmailMessage.thread_id == thread.thread_id
+            ).order_by(EmailMessage.date.asc()).all()
             
-            thread_ids = [t[0] for t in thread_ids]
-            
-            if thread_ids:
-                threads = EmailThread.query.filter(
-                    EmailThread.thread_id.in_(thread_ids)
-                ).order_by(EmailThread.last_updated.desc()).all()
-                
-                messages = EmailMessage.query.filter(
-                    EmailMessage.thread_id.in_(thread_ids)
-                ).order_by(EmailMessage.date.asc()).all()  # Changed to ASC order
-                
-                filtered_messages = [
-                    msg for msg in messages if (
-                        msg.from_email == from_email or
-                        (msg.folder == 'Sent' and msg.from_email == app.config['EMAIL_ADDRESS'])
-                    )
-                ]
-                
-                sender_data.append({
-                    'email': from_email,
-                    'name': from_name or from_email,
-                    'threads': threads,
-                    'messages': filtered_messages
+            if messages:
+                thread_data.append({
+                    'thread': thread,
+                    'messages': messages
                 })
         
-        return render_template('agente_database.html', sender_data=sender_data)
+        return render_template('agente_database.html', thread_data=thread_data)
     except Exception as e:
         app.logger.error(f'Error in agente_database: {str(e)}')
         flash(f'Error al cargar los datos: {str(e)}', 'danger')
-        return render_template('agente_database.html', sender_data=[])
+        return render_template('agente_database.html', thread_data=[])
+
+@app.route('/agente/logs/latest')
+def latest_logs():
+    try:
+        logs = Log.query.order_by(Log.timestamp.desc()).limit(5).all()
+        return jsonify({
+            'status': 'success',
+            'logs': [{
+                'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                'level': log.level,
+                'level_class': log.level_class,
+                'message': log.message
+            } for log in logs]
+        })
+    except Exception as e:
+        app.logger.error(f'Error fetching latest logs: {str(e)}')
+        return jsonify({
+            'status': 'error',
+            'message': 'Error al cargar los registros',
+            'logs': []
+        }), 500

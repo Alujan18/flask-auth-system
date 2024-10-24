@@ -89,42 +89,40 @@ async function toggleBot() {
     
     try {
         const response = await fetch('/agente/bot/toggle', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
+            method: 'POST'
         });
-        const data = await response.json();
         
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
         if (data.status === 'success') {
             updateBotStatus(data.running);
         } else {
-            alert(data.message);
+            throw new Error(data.message || 'Error desconocido');
         }
     } catch (error) {
         console.error('Error:', error);
-        alert('Error al cambiar el estado del bot');
+        alert(`Error al cambiar el estado del bot: ${error.message}`);
+    } finally {
+        toggleBtn.disabled = false;
     }
-    
-    toggleBtn.disabled = false;
 }
 
 // Function to load latest logs
 async function loadLatestLogs() {
     try {
-        const response = await fetch('/agente/logs');
+        const response = await fetch('/agente/logs/latest');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        const text = await response.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(text, 'text/html');
-        const tbody = doc.querySelector('tbody');
-        const latestLogsContainer = document.getElementById('latest-logs');
         
+        const data = await response.json();
+        const latestLogsContainer = document.getElementById('latest-logs');
         latestLogsContainer.innerHTML = '';
         
-        if (!tbody || !tbody.rows.length) {
+        if (!data.logs || !data.logs.length) {
             const noLogsMessage = document.createElement('div');
             noLogsMessage.className = 'list-group-item text-center text-muted';
             noLogsMessage.textContent = 'No hay registros disponibles';
@@ -132,23 +130,15 @@ async function loadLatestLogs() {
             return;
         }
         
-        // Display last 5 logs
-        Array.from(tbody.rows).slice(0, 5).forEach(row => {
-            const timestamp = row.cells[0].textContent;
-            const levelCell = row.cells[1];
-            const levelBadge = levelCell ? levelCell.querySelector('.badge') : null;
-            const level = levelBadge ? levelBadge.textContent : 'INFO';
-            const levelClass = levelBadge ? levelBadge.className.split('bg-')[1] : 'secondary';
-            const message = row.cells[2] ? row.cells[2].textContent : '';
-            
+        data.logs.forEach(log => {
             const logItem = document.createElement('div');
             logItem.className = 'list-group-item';
             logItem.innerHTML = `
                 <div class="d-flex w-100 justify-content-between">
-                    <small class="text-muted">${timestamp}</small>
-                    <span class="badge bg-${levelClass}">${level}</span>
+                    <small class="text-muted">${log.timestamp}</small>
+                    <span class="badge bg-${log.level_class}">${log.level}</span>
                 </div>
-                <p class="mb-1">${message}</p>
+                <p class="mb-1">${log.message}</p>
             `;
             latestLogsContainer.appendChild(logItem);
         });
@@ -170,10 +160,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Load initial bot status
     try {
         const response = await fetch('/agente/bot/status');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const data = await response.json();
         updateBotStatus(data.running);
     } catch (error) {
         console.error('Error loading bot status:', error);
+        alert('Error al cargar el estado del bot');
     }
     
     // Load initial logs
