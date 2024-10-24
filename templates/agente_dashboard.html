@@ -29,4 +29,168 @@
     </li>
 </ul>
 
-[... rest of the existing dashboard content ...]
+<div class="row">
+    <!-- Bot Control Card -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Control del Bot</h5>
+                <div id="bot-status" class="badge bg-secondary">Verificando...</div>
+            </div>
+            <div class="card-body">
+                <p class="card-text">
+                    El bot de correo electrónico procesa automáticamente los mensajes entrantes y
+                    mantiene un registro de todas las actividades.
+                </p>
+                <button id="toggle-bot" class="btn btn-primary" disabled>
+                    <i class="bi bi-power me-2"></i>
+                    <span id="toggle-text">Iniciar Bot</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Latest Logs Card -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Últimos Logs</h5>
+                <a href="{{ url_for('agente_logs') }}" class="btn btn-sm btn-outline-primary">
+                    Ver Todos
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush" id="latest-logs">
+                    <!-- Logs will be populated via JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Function to update bot status UI
+function updateBotStatus(running) {
+    const statusBadge = document.getElementById('bot-status');
+    const toggleBtn = document.getElementById('toggle-bot');
+    const toggleText = document.getElementById('toggle-text');
+    
+    if (running) {
+        statusBadge.className = 'badge bg-success';
+        statusBadge.textContent = 'Activo';
+        toggleText.textContent = 'Detener Bot';
+    } else {
+        statusBadge.className = 'badge bg-danger';
+        statusBadge.textContent = 'Inactivo';
+        toggleText.textContent = 'Iniciar Bot';
+    }
+    toggleBtn.disabled = false;
+}
+
+// Function to toggle bot
+async function toggleBot() {
+    const toggleBtn = document.getElementById('toggle-bot');
+    toggleBtn.disabled = true;
+    
+    try {
+        const response = await fetch('/agente/bot/toggle', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        if (data.status === 'success') {
+            updateBotStatus(data.running);
+        } else {
+            throw new Error(data.message || 'Error desconocido');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert(`Error al cambiar el estado del bot: ${error.message}`);
+    } finally {
+        toggleBtn.disabled = false;
+    }
+}
+
+// Function to load latest logs
+async function loadLatestLogs() {
+    const latestLogsContainer = document.getElementById('latest-logs');
+    
+    try {
+        const response = await fetch('/agente/logs/latest');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        if (data.status !== 'success') {
+            throw new Error(data.message || 'Error loading logs');
+        }
+        
+        latestLogsContainer.innerHTML = '';
+        
+        if (!data.logs || data.logs.length === 0) {
+            const noLogsMessage = document.createElement('div');
+            noLogsMessage.className = 'list-group-item text-center text-muted';
+            noLogsMessage.textContent = 'No hay registros disponibles';
+            latestLogsContainer.appendChild(noLogsMessage);
+            return;
+        }
+        
+        data.logs.forEach(log => {
+            const logItem = document.createElement('div');
+            logItem.className = 'list-group-item';
+            logItem.innerHTML = `
+                <div class="d-flex w-100 justify-content-between">
+                    <small class="text-muted">${log.timestamp}</small>
+                    <span class="badge bg-${log.level_class}">${log.level}</span>
+                </div>
+                <p class="mb-1">${log.message}</p>
+            `;
+            latestLogsContainer.appendChild(logItem);
+        });
+    } catch (error) {
+        console.error('Error loading logs:', error);
+        latestLogsContainer.innerHTML = `
+            <div class="list-group-item text-center text-danger">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                Error al cargar los registros
+            </div>
+        `;
+    }
+}
+
+// Initial setup
+document.addEventListener('DOMContentLoaded', async () => {
+    // Setup bot toggle button
+    document.getElementById('toggle-bot').addEventListener('click', toggleBot);
+    
+    // Load initial bot status
+    try {
+        const response = await fetch('/agente/bot/status');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        updateBotStatus(data.running);
+    } catch (error) {
+        console.error('Error loading bot status:', error);
+        const statusBadge = document.getElementById('bot-status');
+        statusBadge.className = 'badge bg-warning';
+        statusBadge.textContent = 'Error';
+    }
+    
+    // Load initial logs
+    await loadLatestLogs();
+    
+    // Refresh logs every 30 seconds
+    setInterval(loadLatestLogs, 30000);
+});
+</script>
+{% endblock %}

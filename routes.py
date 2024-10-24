@@ -65,6 +65,12 @@ def add_log(level, message):
     """Add a log entry to the database"""
     try:
         with app.app_context():
+            # Check if Log table exists
+            inspector = inspect(db.engine)
+            if 'log' not in inspector.get_table_names():
+                db.create_all()
+                app.logger.info('Log table created')
+            
             log = Log()
             log.level = level
             log.message = message
@@ -350,15 +356,28 @@ def bot_status():
 @app.route('/agente/logs')
 def agente_logs():
     try:
+        # Check if Log table exists
+        inspector = inspect(db.engine)
+        if 'log' not in inspector.get_table_names():
+            db.create_all()
+            app.logger.info('Log table created')
+        
         logs = Log.query.order_by(Log.timestamp.desc()).limit(50).all()
         return render_template('agente_logs.html', logs=logs)
     except Exception as e:
         app.logger.error(f'Error loading logs: {str(e)}')
+        # Make sure we return a valid template even when there's an error
         return render_template('agente_logs.html', logs=[])
 
 @app.route('/agente/logs/latest')
 def latest_logs():
     try:
+        # Check if Log table exists
+        inspector = inspect(db.engine)
+        if 'log' not in inspector.get_table_names():
+            db.create_all()
+            app.logger.info('Log table created')
+            
         logs = Log.query.order_by(Log.timestamp.desc()).limit(5).all()
         log_list = []
         for log in logs:
@@ -462,11 +481,11 @@ def handle_upload(upload_type):
         return redirect(url_for('agente_recursos'))
     
     file = request.files['file']
-    if file.filename == '':
+    if not file or file.filename == '':
         flash('No file selected', 'danger')
         return redirect(url_for('agente_recursos'))
     
-    if file and allowed_file(file.filename):
+    if allowed_file(file.filename):
         filename = secure_filename(file.filename)
         file_path = os.path.join(app.root_path, UPLOAD_FOLDER, upload_type, filename)
         file.save(file_path)
