@@ -399,7 +399,7 @@ def agente_database():
             if threads:
                 thread_data = []
                 for thread in threads:
-                    # Get all unique messages in this thread
+                    # Get all messages in this thread with simple date ordering
                     messages = EmailMessage.query.filter(
                         EmailMessage.thread_id == thread.thread_id,
                         or_(
@@ -407,10 +407,7 @@ def agente_database():
                             EmailMessage.folder == 'Sent'
                         )
                     ).order_by(
-                        EmailMessage.message_id,  # Add this line first
-                        EmailMessage.date.asc()   # Keep the date ordering as secondary
-                    ).distinct(
-                        EmailMessage.message_id
+                        EmailMessage.date.asc()
                     ).all()
                     
                     if messages:
