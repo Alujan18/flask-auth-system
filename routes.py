@@ -85,7 +85,6 @@ def process_emails(emails):
             date_str = msg.get("Date")
             body = get_email_body(msg)
             
-            # Convert date string to datetime
             try:
                 date = parsedate_to_datetime(date_str)
             except:
@@ -93,16 +92,13 @@ def process_emails(emails):
                 add_log('WARNING', f'Invalid date format for email from {from_email}, using current time')
 
             try:
-                # Start a new transaction
                 db.session.begin_nested()
 
-                # Find existing message first to avoid duplicates
                 existing_message = EmailMessage.query.filter_by(message_id=message_id).first()
                 if existing_message:
                     add_log('WARNING', f'Email with message_id {message_id} already exists, skipping')
                     continue
 
-                # Find or create thread first
                 thread_id = None
                 if in_reply_to:
                     ref_email = EmailMessage.query.filter_by(message_id=in_reply_to).first()
@@ -127,7 +123,6 @@ def process_emails(emails):
                     thread = EmailThread.query.filter_by(thread_id=thread_id).first()
                     thread.last_updated = datetime.utcnow()
                 
-                # Create the email message
                 email_msg = EmailMessage()
                 email_msg.message_id = message_id
                 email_msg.thread_id = thread_id
@@ -175,6 +170,7 @@ def bot_process():
         add_log('INFO', 'Bot iniciado')
         connection_retry_count = 0
         max_retries = 3
+        check_interval = 60  # Check every minute
         
         while bot_running:
             try:
@@ -191,15 +187,29 @@ def bot_process():
                             add_log('ERROR', 'Número máximo de intentos de conexión alcanzado')
                             bot_running = False
                             break
-                        time.sleep(60)  # Wait before retry
+                        time.sleep(check_interval)
                         continue
                 
-                # Fetch and process emails
-                emails = email_client.fetch_emails()
-                if emails:
-                    process_emails(emails)
+                try:
+                    emails = email_client.fetch_emails()
+                    if emails:
+                        add_log('INFO', f'Obtenidos {len(emails)} correos nuevos')
+                        process_emails(emails)
+                    else:
+                        add_log('INFO', 'No hay correos nuevos para procesar')
+                except Exception as e:
+                    add_log('ERROR', f'Error al obtener/procesar correos: {str(e)}')
+                    if email_client:
+                        try:
+                            email_client.close_connection()
+                            add_log('WARNING', 'Conexión cerrada debido a error')
+                        except:
+                            pass
+                    email_client = None
+                    time.sleep(check_interval)
+                    continue
                 
-                time.sleep(60)  # Check emails every minute
+                time.sleep(check_interval)
                 
             except Exception as e:
                 add_log('ERROR', f'Error en el bot: {str(e)}')
@@ -210,7 +220,7 @@ def bot_process():
                     except:
                         pass
                 email_client = None
-                time.sleep(60)  # Wait before retrying
+                time.sleep(check_interval)
         
         if email_client:
             try:
@@ -240,12 +250,10 @@ def agente_configuracion():
             'EMAIL_PASSWORD': request.form.get('email_password')
         }
         
-        # Validate required fields
         if not all(config_data.values()):
             flash('Todos los campos son requeridos.', 'danger')
             return render_template('agente_configuracion.html', config=config_data)
         
-        # Validate ports
         try:
             imap_port = int(config_data['IMAP_PORT'])
             smtp_port = int(config_data['SMTP_PORT'])
@@ -256,12 +264,8 @@ def agente_configuracion():
             return render_template('agente_configuracion.html', config=config_data)
         
         try:
-            # Save to .env file
             save_to_env_file(config_data)
-            
-            # Update current session config
             app.config.update(config_data)
-            
             flash('Configuración guardada exitosamente', 'success')
             return redirect(url_for('agente_configuracion'))
         except Exception as e:
@@ -269,13 +273,11 @@ def agente_configuracion():
             flash(f'Error al guardar la configuración: {str(e)}', 'danger')
             return render_template('agente_configuracion.html', config=config_data)
     
-    # GET request - load current config
     return render_template('agente_configuracion.html', config=load_email_config())
 
 @app.route('/agente/test-connection', methods=['POST'])
 def test_connection():
     try:
-        # Create temporary EmailClient with form data
         client = EmailClient()
         client.connect()
         client.close_connection()
@@ -290,7 +292,6 @@ def toggle_bot():
     try:
         with bot_lock:
             if not bot_running:
-                # Check if configuration exists
                 config = load_email_config()
                 if not all(config.values()):
                     return jsonify({
@@ -298,14 +299,12 @@ def toggle_bot():
                         'message': 'Configure los datos del servidor de correo primero'
                     })
                 
-                # Start bot
                 bot_running = True
                 email_bot_thread = threading.Thread(target=bot_process)
                 email_bot_thread.daemon = True
                 email_bot_thread.start()
                 return jsonify({'status': 'success', 'message': 'Bot iniciado', 'running': True})
             else:
-                # Stop bot
                 bot_running = False
                 if email_bot_thread:
                     email_bot_thread.join(timeout=2)
@@ -321,11 +320,15 @@ def bot_status():
 def agente_logs():
     try:
         logs = Log.query.order_by(Log.timestamp.desc()).limit(100).all()
-        return render_template('agente_logs.html', logs=logs)
+        return render_template('agente_logs.html', logs=[{
+            'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            'level': log.level,
+            'level_class': log.level_class,
+            'message': log.message
+        } for log in logs])
     except SQLAlchemyError as e:
         app.logger.error(f'Error fetching logs: {str(e)}')
-        flash('Error al cargar los logs', 'danger')
-        return render_template('agente_logs.html', logs=[])
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/agente/dashboard')
 def agente_dashboard():
@@ -334,25 +337,21 @@ def agente_dashboard():
 @app.route('/agente/database')
 def agente_database():
     try:
-        # Get all unique senders (both from received and sent emails)
         senders = db.session.query(
             EmailMessage.from_email,
             EmailMessage.from_name
         ).filter(
-            EmailMessage.folder == 'INBOX'  # Only get unique senders from inbox
+            EmailMessage.folder == 'INBOX'
         ).distinct().all()
         
         sender_data = []
         for from_email, from_name in senders:
-            # Get all threads where this person is either sender or recipient
             thread_ids = db.session.query(EmailThread.thread_id).distinct().join(
                 EmailMessage,
                 EmailThread.thread_id == EmailMessage.thread_id
             ).filter(
                 or_(
-                    # Emails received from this sender
                     EmailMessage.from_email == from_email,
-                    # Emails sent to this sender (from our email address)
                     and_(
                         EmailMessage.folder == 'Sent',
                         EmailMessage.from_email == app.config['EMAIL_ADDRESS']
@@ -363,17 +362,14 @@ def agente_database():
             thread_ids = [t[0] for t in thread_ids]
             
             if thread_ids:
-                # Get threads sorted by last_updated
                 threads = EmailThread.query.filter(
                     EmailThread.thread_id.in_(thread_ids)
                 ).order_by(EmailThread.last_updated.desc()).all()
                 
-                # Get all messages for these threads
                 messages = EmailMessage.query.filter(
                     EmailMessage.thread_id.in_(thread_ids)
                 ).order_by(EmailMessage.date.desc()).all()
                 
-                # Filter messages to only include those from/to this sender
                 filtered_messages = [
                     msg for msg in messages if (
                         msg.from_email == from_email or

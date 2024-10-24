@@ -83,31 +83,43 @@ class EmailClient:
         
         for folder in folders:
             try:
-                self.connection.select(folder)
-                result, data = self.connection.sort('REVERSE DATE', 'UTF-8', 'ALL')
-                if result != 'OK':
-                    print(f"Error al buscar correos en {folder}.")
+                # Select folder first
+                typ, _ = self.connection.select(folder, readonly=True)
+                if typ != 'OK':
+                    print(f"Error al seleccionar la carpeta {folder}")
                     continue
-                    
+
+                # Search for all emails in the folder
+                typ, data = self.connection.search(None, 'ALL')
+                if typ != 'OK':
+                    print(f"Error al buscar correos en {folder}")
+                    continue
+
                 email_count = 0
                 max_emails = 50  # Limit per folder
                 
-                for num in data[0].split():
+                # Reverse the order to get newest first
+                message_numbers = data[0].split()[::-1]
+                
+                for num in message_numbers:
                     if email_count >= max_emails:
                         break
                         
                     try:
-                        result, msg_data = self.connection.fetch(num, '(RFC822)')
-                        if result == 'OK':
-                            msg = email.message_from_bytes(msg_data[0][1])
-                            emails.append((num.decode(), msg, folder))
+                        typ, msg_data = self.connection.fetch(num, '(RFC822)')
+                        if typ == 'OK':
+                            email_message = email.message_from_bytes(msg_data[0][1])
+                            emails.append((num.decode(), email_message, folder))
                             email_count += 1
                         else:
-                            print(f"Error al obtener el correo UID {num.decode()} de {folder}.")
+                            print(f"Error al obtener el correo {num.decode()} de {folder}")
                     except Exception as e:
-                        print(f"Error al obtener el correo UID {num.decode()} de {folder}: {e}")
+                        print(f"Error al obtener el correo {num.decode()} de {folder}: {e}")
+                        continue
+                    
             except Exception as e:
                 print(f"Error al acceder a la carpeta {folder}: {e}")
+                continue
                 
         return emails
 
@@ -127,10 +139,13 @@ class EmailClient:
             try:
                 self.smtp_connection.send_message(msg)
                 print(f"Correo enviado a {to_email}")
-                return
+                return True
             except smtplib.SMTPException as e:
                 print(f"Error al enviar correo a {to_email}: {e}")
-                print("Intentando reconectar al servidor SMTP.")
-                self.reconnect_smtp()
-                time.sleep(5)
-        print(f"No se pudo enviar el correo a {to_email} después de varios intentos.")
+                if attempt < max_retries - 1:
+                    print("Intentando reconectar al servidor SMTP.")
+                    self.reconnect_smtp()
+                    time.sleep(5)
+                    
+        print(f"No se pudo enviar el correo a {to_email} después de {max_retries} intentos.")
+        return False

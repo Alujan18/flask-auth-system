@@ -23,6 +23,10 @@ args = "Test User Creation"
 task = "workflow.run"
 args = "Recreate Database"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Update Database"
+
 [[workflows.workflow]]
 name = "Flask Web App"
 author = "agent"
@@ -56,6 +60,17 @@ agentRequireRestartOnSave = false
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python recreate_db.py"
+
+[[workflows.workflow]]
+name = "Update Database"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python update_database.py"
 
 [deployment]
 run = ["sh", "-c", "python main.py"]

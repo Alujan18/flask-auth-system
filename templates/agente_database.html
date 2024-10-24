@@ -47,6 +47,11 @@
                                 <small class="text-muted ms-2">
                                     ({{ thread.last_updated.strftime('%Y-%m-%d %H:%M:%S') }})
                                 </small>
+                                {% if thread.reply_by_ia %}
+                                    <span class="badge bg-success ms-2">Procesado por IA</span>
+                                {% else %}
+                                    <span class="badge bg-secondary ms-2">No Procesado</span>
+                                {% endif %}
                             </button>
                         </h2>
                         <div id="thread-{{ thread.id }}" class="accordion-collapse collapse" 
@@ -59,6 +64,7 @@
                                                 <th>From</th>
                                                 <th>Date</th>
                                                 <th>Subject</th>
+                                                <th>Status</th>
                                                 <th>Body</th>
                                             </tr>
                                         </thead>
@@ -73,6 +79,13 @@
                                                 </td>
                                                 <td>{{ message.date.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                                                 <td>{{ message.subject }}</td>
+                                                <td>
+                                                    {% if message.reply_by_ia %}
+                                                        <span class="badge bg-success">Procesado por IA</span>
+                                                    {% else %}
+                                                        <span class="badge bg-secondary">No Procesado</span>
+                                                    {% endif %}
+                                                </td>
                                                 <td>
                                                     <button class="btn btn-sm btn-outline-primary" 
                                                             type="button" 
