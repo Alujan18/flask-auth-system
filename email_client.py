@@ -79,7 +79,7 @@ class EmailClient:
 
     def fetch_emails(self):
         emails = []
-        folders = ["INBOX", "Sent"]  # Check both INBOX and Sent folders
+        folders = ["INBOX"]  # Only check INBOX for now
         
         for folder in folders:
             try:
@@ -89,8 +89,8 @@ class EmailClient:
                     print(f"Error al seleccionar la carpeta {folder}")
                     continue
 
-                # Search for all emails in the folder
-                typ, data = self.connection.search(None, 'ALL')
+                # Search for new emails in the folder
+                typ, data = self.connection.search(None, 'UNSEEN')
                 if typ != 'OK':
                     print(f"Error al buscar correos en {folder}")
                     continue
@@ -98,7 +98,7 @@ class EmailClient:
                 email_count = 0
                 max_emails = 50  # Limit per folder
                 
-                # Reverse the order to get newest first
+                # Process emails in reverse order (newest first)
                 message_numbers = data[0].split()[::-1]
                 
                 for num in message_numbers:
