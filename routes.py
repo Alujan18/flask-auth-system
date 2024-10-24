@@ -14,7 +14,6 @@ import uuid
 import json
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import inspect, or_, and_
-import traceback
 
 # Load environment variables
 load_dotenv()
@@ -203,7 +202,7 @@ def bot_process():
                 time.sleep(60)  # Check emails every minute
                 
             except Exception as e:
-                add_log('ERROR', f'Error en el bot: {str(e)}\n{traceback.format_exc()}')
+                add_log('ERROR', f'Error en el bot: {str(e)}')
                 if email_client:
                     try:
                         email_client.close_connection()
@@ -350,11 +349,11 @@ def agente_database():
                 EmailMessage,
                 EmailThread.thread_id == EmailMessage.thread_id
             ).filter(
-                db.or_(
+                or_(
                     # Emails received from this sender
                     EmailMessage.from_email == from_email,
                     # Emails sent to this sender (from our email address)
-                    db.and_(
+                    and_(
                         EmailMessage.folder == 'Sent',
                         EmailMessage.from_email == app.config['EMAIL_ADDRESS']
                     )
