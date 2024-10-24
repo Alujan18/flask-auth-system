@@ -57,53 +57,30 @@
                         <div id="thread-{{ thread.id }}" class="accordion-collapse collapse" 
                              data-bs-parent="#sender-{{ loop.index }}">
                             <div class="accordion-body">
-                                <div class="table-responsive">
-                                    <table class="table table-sm">
-                                        <thead>
-                                            <tr>
-                                                <th>From</th>
-                                                <th>Date</th>
-                                                <th>Subject</th>
-                                                <th>Status</th>
-                                                <th>Body</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for message in sender.messages if message.thread_id == thread.thread_id %}
-                                            <tr>
-                                                <td>
-                                                    {{ message.from_name }} &lt;{{ message.from_email }}&gt;
-                                                    {% if message.folder == 'Sent' %}
-                                                        <span class="badge bg-info">Enviado</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>{{ message.date.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-                                                <td>{{ message.subject }}</td>
-                                                <td>
-                                                    {% if message.reply_by_ia %}
-                                                        <span class="badge bg-success">Procesado por IA</span>
-                                                    {% else %}
-                                                        <span class="badge bg-secondary">No Procesado</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    <button class="btn btn-sm btn-outline-primary" 
-                                                            type="button" 
-                                                            data-bs-toggle="collapse" 
-                                                            data-bs-target="#body-{{ message.id }}">
-                                                        Show Content
-                                                    </button>
-                                                    <div class="collapse mt-2" id="body-{{ message.id }}">
-                                                        <div class="card card-body">
-                                                            <pre class="mb-0">{{ message.body }}</pre>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
+                                {% for message in sender.messages if message.thread_id == thread.thread_id %}
+                                <div class="email-message {% if message.in_reply_to %}ms-4{% endif %}">
+                                    <div class="card mb-2">
+                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <strong>{{ message.from_name }} &lt;{{ message.from_email }}&gt;</strong>
+                                                {% if message.folder == 'Sent' %}
+                                                    <span class="badge bg-info ms-2">Enviado</span>
+                                                {% endif %}
+                                            </div>
+                                            {% if message.reply_by_ia %}
+                                                <span class="badge bg-success">Procesado por IA</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">No Procesado</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="card-body">
+                                            <p class="text-muted mb-2">{{ message.date.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                                            <h6 class="card-subtitle mb-2">{{ message.subject }}</h6>
+                                            <p class="card-text">{{ message.body }}</p>
+                                        </div>
+                                    </div>
                                 </div>
+                                {% endfor %}
                             </div>
                         </div>
                     </div>

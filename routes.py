@@ -368,7 +368,7 @@ def agente_database():
                 
                 messages = EmailMessage.query.filter(
                     EmailMessage.thread_id.in_(thread_ids)
-                ).order_by(EmailMessage.date.desc()).all()
+                ).order_by(EmailMessage.date.asc()).all()  # Changed to ASC order
                 
                 filtered_messages = [
                     msg for msg in messages if (
