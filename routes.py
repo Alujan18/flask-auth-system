@@ -63,6 +63,74 @@ def add_log(level, message):
         except:
             pass
 
+def bot_process():
+    """Email bot process that runs in the background"""
+    global bot_running, email_client
+    
+    with app.app_context():
+        add_log('INFO', 'Bot iniciado')
+        connection_retry_count = 0
+        max_retries = 3
+        check_interval = 60  # Check every minute
+        
+        while bot_running:
+            try:
+                if not email_client:
+                    email_client = EmailClient()
+                    try:
+                        email_client.connect()
+                        add_log('SUCCESS', 'Conexión establecida con el servidor de correo')
+                        connection_retry_count = 0
+                    except Exception as e:
+                        connection_retry_count += 1
+                        add_log('ERROR', f'Error de conexión (intento {connection_retry_count}): {str(e)}')
+                        if connection_retry_count >= max_retries:
+                            add_log('ERROR', 'Número máximo de intentos de conexión alcanzado')
+                            bot_running = False
+                            break
+                        time.sleep(check_interval)
+                        continue
+                
+                try:
+                    emails = email_client.fetch_emails()
+                    if emails:
+                        add_log('INFO', f'Obtenidos {len(emails)} correos nuevos')
+                        process_emails(emails)
+                    else:
+                        add_log('INFO', 'No hay correos nuevos para procesar')
+                except Exception as e:
+                    add_log('ERROR', f'Error al obtener/procesar correos: {str(e)}')
+                    if email_client:
+                        try:
+                            email_client.close_connection()
+                            add_log('WARNING', 'Conexión cerrada debido a error')
+                        except:
+                            pass
+                    email_client = None
+                    time.sleep(check_interval)
+                    continue
+                
+                time.sleep(check_interval)
+                
+            except Exception as e:
+                add_log('ERROR', f'Error en el bot: {str(e)}')
+                if email_client:
+                    try:
+                        email_client.close_connection()
+                        add_log('WARNING', 'Conexión cerrada debido a error')
+                    except:
+                        pass
+                email_client = None
+                time.sleep(check_interval)
+        
+        if email_client:
+            try:
+                email_client.close_connection()
+                add_log('INFO', 'Conexión cerrada correctamente')
+            except Exception as e:
+                add_log('ERROR', f'Error al cerrar la conexión: {str(e)}')
+        add_log('INFO', 'Bot detenido')
+
 def process_emails(emails):
     """Process incoming emails and store them in the database"""
     for email_id, msg, folder in emails:
@@ -153,74 +221,6 @@ def process_emails(emails):
         except Exception as e:
             add_log('ERROR', f'Error processing email {email_id}: {str(e)}')
             continue
-
-def bot_process():
-    """Email bot process that runs in the background"""
-    global bot_running, email_client
-    
-    with app.app_context():
-        add_log('INFO', 'Bot iniciado')
-        connection_retry_count = 0
-        max_retries = 3
-        check_interval = 60  # Check every minute
-        
-        while bot_running:
-            try:
-                if not email_client:
-                    email_client = EmailClient()
-                    try:
-                        email_client.connect()
-                        add_log('SUCCESS', 'Conexión establecida con el servidor de correo')
-                        connection_retry_count = 0
-                    except Exception as e:
-                        connection_retry_count += 1
-                        add_log('ERROR', f'Error de conexión (intento {connection_retry_count}): {str(e)}')
-                        if connection_retry_count >= max_retries:
-                            add_log('ERROR', 'Número máximo de intentos de conexión alcanzado')
-                            bot_running = False
-                            break
-                        time.sleep(check_interval)
-                        continue
-                
-                try:
-                    emails = email_client.fetch_emails()
-                    if emails:
-                        add_log('INFO', f'Obtenidos {len(emails)} correos nuevos')
-                        process_emails(emails)
-                    else:
-                        add_log('INFO', 'No hay correos nuevos para procesar')
-                except Exception as e:
-                    add_log('ERROR', f'Error al obtener/procesar correos: {str(e)}')
-                    if email_client:
-                        try:
-                            email_client.close_connection()
-                            add_log('WARNING', 'Conexión cerrada debido a error')
-                        except:
-                            pass
-                    email_client = None
-                    time.sleep(check_interval)
-                    continue
-                
-                time.sleep(check_interval)
-                
-            except Exception as e:
-                add_log('ERROR', f'Error en el bot: {str(e)}')
-                if email_client:
-                    try:
-                        email_client.close_connection()
-                        add_log('WARNING', 'Conexión cerrada debido a error')
-                    except:
-                        pass
-                email_client = None
-                time.sleep(check_interval)
-        
-        if email_client:
-            try:
-                email_client.close_connection()
-                add_log('INFO', 'Conexión cerrada correctamente')
-            except Exception as e:
-                add_log('ERROR', f'Error al cerrar la conexión: {str(e)}')
-        add_log('INFO', 'Bot detenido')
 
 @app.route('/')
 def index():
@@ -378,32 +378,52 @@ def agente_database():
         
         sender_data = []
         for from_email, from_name in senders:
-            # Get all threads where this person is involved
+            # Get all threads where this person is either sender or recipient
             threads = db.session.query(EmailThread).join(
                 EmailMessage,
                 EmailThread.thread_id == EmailMessage.thread_id
             ).filter(
-                EmailMessage.from_email == from_email
+                or_(
+                    EmailMessage.from_email == from_email,
+                    and_(
+                        EmailMessage.folder == 'Sent',
+                        EmailMessage.thread_id.in_(
+                            db.session.query(EmailMessage.thread_id).filter(
+                                EmailMessage.from_email == from_email
+                            )
+                        )
+                    )
+                )
             ).distinct().order_by(EmailThread.last_updated.desc()).all()
             
             if threads:
                 thread_data = []
                 for thread in threads:
-                    # Get all messages in this thread
+                    # Get all unique messages in this thread
                     messages = EmailMessage.query.filter(
-                        EmailMessage.thread_id == thread.thread_id
-                    ).order_by(EmailMessage.date.asc()).all()
+                        EmailMessage.thread_id == thread.thread_id,
+                        or_(
+                            EmailMessage.from_email == from_email,
+                            EmailMessage.folder == 'Sent'
+                        )
+                    ).distinct(
+                        EmailMessage.message_id
+                    ).order_by(
+                        EmailMessage.date.asc()
+                    ).all()
                     
-                    thread_data.append({
-                        'thread': thread,
-                        'messages': messages
-                    })
+                    if messages:
+                        thread_data.append({
+                            'thread': thread,
+                            'messages': messages
+                        })
                 
-                sender_data.append({
-                    'email': from_email,
-                    'name': from_name or from_email,
-                    'threads': thread_data
-                })
+                if thread_data:
+                    sender_data.append({
+                        'email': from_email,
+                        'name': from_name or from_email,
+                        'threads': thread_data
+                    })
         
         return render_template('agente_database.html', sender_data=sender_data)
     except Exception as e:
