@@ -22,33 +22,11 @@
             <i class="bi bi-database me-2"></i>Database
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'agente_recursos' %}active{% endif %}" href="{{ url_for('agente_recursos') }}">
+            <i class="bi bi-file-text me-2"></i>Recursos
+        </a>
+    </li>
 </ul>
 
-<div class="card">
-    <div class="card-header">
-        <h4 class="mb-0">Logs del Sistema</h4>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Tipo</th>
-                        <th>Mensaje</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for log in logs %}
-                    <tr>
-                        <td>{{ log.timestamp }}</td>
-                        <td><span class="badge bg-{{ log.level_class }}">{{ log.level }}</span></td>
-                        <td>{{ log.message }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-{% endblock %}
+[... rest of the existing logs content ...]

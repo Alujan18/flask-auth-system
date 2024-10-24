@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block content %}
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'agente_dashboard' %}active{% endif %}" href="{{ url_for('agente_dashboard') }}">
+            <i class="bi bi-speedometer2 me-2"></i>Dashboard
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'agente_configuracion' %}active{% endif %}" href="{{ url_for('agente_configuracion') }}">
+            <i class="bi bi-gear me-2"></i>Configuración
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'agente_logs' %}active{% endif %}" href="{{ url_for('agente_logs') }}">
+            <i class="bi bi-journals me-2"></i>Logs
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'agente_database' %}active{% endif %}" href="{{ url_for('agente_database') }}">
+            <i class="bi bi-database me-2"></i>Database
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'agente_recursos' %}active{% endif %}" href="{{ url_for('agente_recursos') }}">
+            <i class="bi bi-file-text me-2"></i>Recursos
+        </a>
+    </li>
+</ul>
+
+<div class="row">
+    <!-- Prompt Files Section -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Archivos Prompt</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('upload_prompt') }}" method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="prompt_file" class="form-label">Seleccionar archivo de texto</label>
+                        <input type="file" class="form-control" id="prompt_file" name="file" accept=".txt">
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-upload me-2"></i>Subir Prompt
+                    </button>
+                </form>
+                <div class="mt-4" id="prompt-preview">
+                    <!-- Preview content will be displayed here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Files Section -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Archivos Info</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('upload_info') }}" method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="info_file" class="form-label">Seleccionar archivo de texto</label>
+                        <input type="file" class="form-control" id="info_file" name="file" accept=".txt">
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-upload me-2"></i>Subir Info
+                    </button>
+                </form>
+                <div class="mt-4" id="info-preview">
+                    <!-- Preview content will be displayed here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// File preview functionality
+function handleFileSelect(fileInput, previewId) {
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById(previewId).innerHTML = `
+                    <h6 class="mb-3">Vista previa:</h6>
+                    <pre class="bg-light p-3 rounded">${e.target.result}</pre>
+                `;
+            };
+            reader.readAsText(file);
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    handleFileSelect(document.getElementById('prompt_file'), 'prompt-preview');
+    handleFileSelect(document.getElementById('info_file'), 'info-preview');
+});
+</script>
+{% endblock %}
