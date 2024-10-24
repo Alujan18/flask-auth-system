@@ -29,4 +29,35 @@
     </li>
 </ul>
 
-[... rest of the existing logs content ...]
+<div class="card">
+    <div class="card-header">
+        <h4 class="mb-0">Logs del Sistema</h4>
+    </div>
+    <div class="card-body">
+        {% if logs %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Level</th>
+                            <th>Message</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                            <td><span class="badge bg-{{ log.level_class }}">{{ log.level }}</span></td>
+                            <td>{{ log.message }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="text-muted text-center my-4">No hay logs disponibles.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
