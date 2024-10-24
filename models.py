@@ -1,5 +1,6 @@
 from app import db
 from datetime import datetime
+from sqlalchemy import inspect
 
 class Log(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -25,12 +26,12 @@ class EmailThread(db.Model):
 class EmailMessage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     message_id = db.Column(db.String(255), unique=True, nullable=False)
-    thread_id = db.Column(db.String(255), db.ForeignKey('email_thread.thread_id'))
+    thread_id = db.Column(db.String(255), db.ForeignKey('email_thread.thread_id'), nullable=False)
     from_name = db.Column(db.String(255))
-    from_email = db.Column(db.String(255))
+    from_email = db.Column(db.String(255), nullable=False)
     subject = db.Column(db.String(255))
     body = db.Column(db.Text)
-    date = db.Column(db.DateTime)
+    date = db.Column(db.DateTime, default=datetime.utcnow)
     in_reply_to = db.Column(db.String(255))
     references = db.Column(db.Text)  # Store as JSON string
-    folder = db.Column(db.String(50))  # Added folder field
+    folder = db.Column(db.String(50), nullable=False, default='INBOX')  # Added folder field

@@ -13,6 +13,7 @@ import time
 import uuid
 import json
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import inspect
 import traceback
 
 # Load environment variables
@@ -272,22 +273,6 @@ def agente_configuracion():
 @app.route('/agente/test-connection', methods=['POST'])
 def test_connection():
     try:
-        config_data = {
-            'IMAP_SERVER': request.form.get('imap_server'),
-            'IMAP_PORT': request.form.get('imap_port'),
-            'SMTP_SERVER': request.form.get('smtp_server'),
-            'SMTP_PORT': request.form.get('smtp_port'),
-            'EMAIL_ADDRESS': request.form.get('email_address'),
-            'EMAIL_PASSWORD': request.form.get('email_password')
-        }
-
-        # Validate required fields
-        if not all(config_data.values()):
-            return jsonify({
-                'status': 'error',
-                'message': 'Todos los campos son requeridos para probar la conexión'
-            })
-
         # Create temporary EmailClient with form data
         client = EmailClient()
         client.connect()
@@ -347,6 +332,18 @@ def agente_dashboard():
 @app.route('/agente/database')
 def agente_database():
     try:
+        # Verify table exists and has the required columns
+        inspector = inspect(db.engine)
+        if 'email_message' not in inspector.get_table_names():
+            raise Exception("Email message table does not exist")
+        
+        columns = [c['name'] for c in inspector.get_columns('email_message')]
+        required_columns = ['from_email', 'from_name', 'folder', 'thread_id']
+        missing_columns = [c for c in required_columns if c not in columns]
+        
+        if missing_columns:
+            raise Exception(f"Missing columns in email_message table: {', '.join(missing_columns)}")
+
         # Get all unique senders with their threads and messages
         senders = db.session.query(
             EmailMessage.from_email,
@@ -358,10 +355,7 @@ def agente_database():
             # Get all threads where this person is either sender or recipient
             thread_ids = db.session.query(EmailThread.thread_id)\
                 .join(EmailMessage)\
-                .filter(
-                    (EmailMessage.from_email == from_email) |
-                    (EmailMessage.folder == 'Sent')
-                )\
+                .filter(EmailMessage.from_email == from_email)\
                 .distinct().all()
             thread_ids = [t[0] for t in thread_ids]
             
@@ -388,5 +382,5 @@ def agente_database():
         return render_template('agente_database.html', sender_data=sender_data)
     except Exception as e:
         app.logger.error(f'Error in agente_database: {str(e)}')
-        flash('Error al cargar los datos', 'danger')
+        flash('Error al cargar los datos: ' + str(e), 'danger')
         return render_template('agente_database.html', sender_data=[])
