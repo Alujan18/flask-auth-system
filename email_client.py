@@ -79,7 +79,7 @@ class EmailClient:
 
     def fetch_emails(self):
         emails = []
-        folders = ["INBOX", "Sent"]  # Check both INBOX and Sent folders
+        folders = ["INBOX"]  # Only check INBOX for now
         
         for folder in folders:
             try:

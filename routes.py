@@ -139,7 +139,7 @@ def process_emails(emails):
                 db.session.add(email_msg)
                 db.session.commit()
 
-                add_log('INFO', f'Nuevo email procesado:\nThread ID: {thread_id}\nDe: {from_name} <{from_email}>\nFecha: {date_str}\nAsunto: {subject}\nMessage-ID: {message_id}\nIn-Reply-To: {in_reply_to or "N/A"}\n----------------------------------------\n{body[:50] + "..." if len(body) > 50 else body}')
+                add_log('INFO', f'New email processed:\nThread ID: {thread_id}\nFrom: {from_name} <{from_email}>\nDate: {date_str}\nSubject: {subject}\nMessage-ID: {message_id}\nIn-Reply-To: {in_reply_to or "N/A"}\n----------------------------------------\n{body[:50] + "..." if len(body) > 50 else body}')
 
             except SQLAlchemyError as e:
                 db.session.rollback()
@@ -159,7 +159,7 @@ def bot_process():
     global bot_running, email_client
     
     with app.app_context():
-        add_log('INFO', 'Bot iniciado')
+        add_log('INFO', 'Bot started')
         connection_retry_count = 0
         max_retries = 3
         check_interval = 60  # Check every minute
@@ -170,13 +170,13 @@ def bot_process():
                     email_client = EmailClient()
                     try:
                         email_client.connect()
-                        add_log('SUCCESS', 'Conexión establecida con el servidor de correo')
+                        add_log('SUCCESS', 'Connection established with email server')
                         connection_retry_count = 0
                     except Exception as e:
                         connection_retry_count += 1
-                        add_log('ERROR', f'Error de conexión (intento {connection_retry_count}): {str(e)}')
+                        add_log('ERROR', f'Connection error (attempt {connection_retry_count}): {str(e)}')
                         if connection_retry_count >= max_retries:
-                            add_log('ERROR', 'Número máximo de intentos de conexión alcanzado')
+                            add_log('ERROR', 'Maximum connection attempts reached')
                             bot_running = False
                             break
                         time.sleep(check_interval)
@@ -185,16 +185,16 @@ def bot_process():
                 try:
                     emails = email_client.fetch_emails()
                     if emails:
-                        add_log('INFO', f'Obtenidos {len(emails)} correos nuevos')
+                        add_log('INFO', f'Retrieved {len(emails)} new emails')
                         process_emails(emails)
                     else:
-                        add_log('INFO', 'No hay correos nuevos para procesar')
+                        add_log('INFO', 'No new emails to process')
                 except Exception as e:
-                    add_log('ERROR', f'Error al obtener/procesar correos: {str(e)}')
+                    add_log('ERROR', f'Error fetching/processing emails: {str(e)}')
                     if email_client:
                         try:
                             email_client.close_connection()
-                            add_log('WARNING', 'Conexión cerrada debido a error')
+                            add_log('WARNING', 'Connection closed due to error')
                         except:
                             pass
                     email_client = None
@@ -204,11 +204,11 @@ def bot_process():
                 time.sleep(check_interval)
                 
             except Exception as e:
-                add_log('ERROR', f'Error en el bot: {str(e)}')
+                add_log('ERROR', f'Bot error: {str(e)}')
                 if email_client:
                     try:
                         email_client.close_connection()
-                        add_log('WARNING', 'Conexión cerrada debido a error')
+                        add_log('WARNING', 'Connection closed due to error')
                     except:
                         pass
                 email_client = None
@@ -217,10 +217,10 @@ def bot_process():
         if email_client:
             try:
                 email_client.close_connection()
-                add_log('INFO', 'Conexión cerrada correctamente')
+                add_log('INFO', 'Connection closed successfully')
             except Exception as e:
-                add_log('ERROR', f'Error al cerrar la conexión: {str(e)}')
-        add_log('INFO', 'Bot detenido')
+                add_log('ERROR', f'Error closing connection: {str(e)}')
+        add_log('INFO', 'Bot stopped')
 
 @app.route('/')
 def index():
@@ -243,26 +243,26 @@ def agente_configuracion():
         }
         
         if not all(config_data.values()):
-            flash('Todos los campos son requeridos.', 'danger')
+            flash('All fields are required.', 'danger')
             return render_template('agente_configuracion.html', config=config_data)
         
         try:
             imap_port = int(config_data['IMAP_PORT'] or 0)
             smtp_port = int(config_data['SMTP_PORT'] or 0)
             if not (0 <= imap_port <= 65535 and 0 <= smtp_port <= 65535):
-                raise ValueError("Puerto inválido")
+                raise ValueError("Invalid port")
         except ValueError:
-            flash('Los puertos deben ser números válidos entre 0 y 65535.', 'danger')
+            flash('Ports must be valid numbers between 0 and 65535.', 'danger')
             return render_template('agente_configuracion.html', config=config_data)
         
         try:
             save_to_env_file(config_data)
             app.config.update(config_data)
-            flash('Configuración guardada exitosamente', 'success')
+            flash('Configuration saved successfully', 'success')
             return redirect(url_for('agente_configuracion'))
         except Exception as e:
             app.logger.error(f'Error saving configuration: {str(e)}')
-            flash(f'Error al guardar la configuración: {str(e)}', 'danger')
+            flash(f'Error saving configuration: {str(e)}', 'danger')
             return render_template('agente_configuracion.html', config=config_data)
     
     return render_template('agente_configuracion.html', config=load_email_config())
@@ -273,9 +273,9 @@ def test_connection():
         client = EmailClient()
         client.connect()
         client.close_connection()
-        return jsonify({'status': 'success', 'message': 'Conexión exitosa a IMAP y SMTP'})
+        return jsonify({'status': 'success', 'message': 'Successfully connected to IMAP and SMTP'})
     except Exception as e:
-        return jsonify({'status': 'error', 'message': f'Error de conexión: {str(e)}'})
+        return jsonify({'status': 'error', 'message': f'Connection error: {str(e)}'})
 
 @app.route('/agente/clear-database', methods=['POST'])
 def clear_database():
@@ -289,17 +289,17 @@ def clear_database():
         db.create_all()
         
         # Add success log
-        add_log('INFO', 'Base de datos limpiada exitosamente')
+        add_log('INFO', 'Database cleared successfully')
         
         return jsonify({
             'status': 'success',
-            'message': 'Base de datos limpiada exitosamente'
+            'message': 'Database cleared successfully'
         })
     except Exception as e:
         app.logger.error(f'Error clearing database: {str(e)}')
         return jsonify({
             'status': 'error',
-            'message': f'Error al limpiar la base de datos: {str(e)}'
+            'message': f'Error clearing database: {str(e)}'
         }), 500
 
 @app.route('/agente/bot/toggle', methods=['POST'])
@@ -313,19 +313,19 @@ def toggle_bot():
                 if not all(config.values()):
                     return jsonify({
                         'status': 'error',
-                        'message': 'Configure los datos del servidor de correo primero'
+                        'message': 'Configure email server data first'
                     })
                 
                 bot_running = True
                 email_bot_thread = threading.Thread(target=bot_process)
                 email_bot_thread.daemon = True
                 email_bot_thread.start()
-                return jsonify({'status': 'success', 'message': 'Bot iniciado', 'running': True})
+                return jsonify({'status': 'success', 'message': 'Bot started', 'running': True})
             else:
                 bot_running = False
                 if email_bot_thread:
                     email_bot_thread.join(timeout=2)
-                return jsonify({'status': 'success', 'message': 'Bot detenido', 'running': False})
+                return jsonify({'status': 'success', 'message': 'Bot stopped', 'running': False})
     except Exception as e:
         return jsonify({'status': 'error', 'message': f'Error: {str(e)}'})
 
@@ -346,22 +346,25 @@ def agente_logs():
 def latest_logs():
     try:
         logs = Log.query.order_by(Log.timestamp.desc()).limit(5).all()
-        return jsonify({
-            'status': 'success',
-            'logs': [{
+        log_list = []
+        for log in logs:
+            log_list.append({
                 'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                 'level': log.level,
                 'level_class': log.level_class,
                 'message': log.message
-            } for log in logs]
+            })
+        return jsonify({
+            'status': 'success',
+            'logs': log_list
         })
     except Exception as e:
         app.logger.error(f'Error fetching latest logs: {str(e)}')
         return jsonify({
             'status': 'error',
-            'message': 'Error al cargar los registros',
+            'message': str(e),
             'logs': []
-        }), 500
+        })
 
 @app.route('/agente/dashboard')
 def agente_dashboard():
@@ -399,29 +402,14 @@ def agente_database():
             if threads:
                 thread_data = []
                 for thread in threads:
-                    # Get all messages in this thread with proper filtering
+                    # Get all messages in this thread
                     messages = EmailMessage.query.filter(
                         EmailMessage.thread_id == thread.thread_id,
                         or_(
                             EmailMessage.from_email == from_email,
                             EmailMessage.folder == 'Sent'
                         )
-                    ).group_by(
-                        EmailMessage.message_id,
-                        EmailMessage.id,
-                        EmailMessage.thread_id,
-                        EmailMessage.from_name,
-                        EmailMessage.from_email,
-                        EmailMessage.subject,
-                        EmailMessage.body,
-                        EmailMessage.date,
-                        EmailMessage.in_reply_to,
-                        EmailMessage.references,
-                        EmailMessage.folder,
-                        EmailMessage.reply_by_ia
-                    ).order_by(
-                        EmailMessage.date.asc()
-                    ).all()
+                    ).order_by(EmailMessage.date.asc()).all()
                     
                     if messages:
                         thread_data.append({
@@ -439,5 +427,5 @@ def agente_database():
         return render_template('agente_database.html', sender_data=sender_data)
     except Exception as e:
         app.logger.error(f'Error in agente_database: {str(e)}')
-        flash(f'Error al cargar los datos: {str(e)}', 'danger')
+        flash(f'Error loading data: {str(e)}', 'danger')
         return render_template('agente_database.html', sender_data=[])
