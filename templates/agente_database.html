@@ -72,9 +72,16 @@
                             <div class="ps-3 border-start">
                                 <p class="text-muted mb-2">{{ message.date.strftime('%Y-%m-%d %H:%M:%S') }}</p>
                                 {% if message.folder == 'Sent' %}
-                                    <p class="mb-0">{{ message.body.split('El')[0] if message.body and 'El' in message.body else message.body }}</p>
+                                    {% set message_parts = message.body.split('Reenviado:') %}
+                                    {% if message_parts|length > 1 %}
+                                        <p class="mb-0">{{ message_parts[0].strip() }}</p>
+                                    {% else %}
+                                        {% set message_parts = message.body.split('El') %}
+                                        <p class="mb-0">{{ message_parts[0].strip() if message_parts|length > 1 else message.body }}</p>
+                                    {% endif %}
                                 {% else %}
-                                    <p class="mb-0">{{ message.body }}</p>
+                                    {% set message_parts = message.body.split('Reenviado:') %}
+                                    <p class="mb-0">{{ message_parts[0].strip() }}</p>
                                 {% endif %}
                             </div>
                         </div>

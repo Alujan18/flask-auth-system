@@ -38,24 +38,17 @@ def load_email_config():
 def save_to_env_file(config_data):
     """Save configuration to .env file"""
     env_path = Path('.env')
-    
-    # Create .env file if it doesn't exist
     if not env_path.exists():
         env_path.touch()
-    
-    # Update each configuration value
     for key, value in config_data.items():
         set_key(str(env_path), key, str(value))
 
 def add_log(level, message):
     """Add a log entry to the database"""
     try:
-        with app.app_context():
-            log = Log()
-            log.level = level
-            log.message = message
-            db.session.add(log)
-            db.session.commit()
+        log = Log(level=level, message=message)
+        db.session.add(log)
+        db.session.commit()
     except Exception as e:
         print(f"Error adding log: {str(e)}")
         try:
@@ -67,7 +60,6 @@ def process_emails(emails):
     """Process incoming emails and store them in the database"""
     for email_id, msg, folder in emails:
         try:
-            # Parse email headers
             from_raw = msg.get("From")
             name, email_addr = parseaddr(from_raw)
             from_name = decode_str(name)
@@ -75,7 +67,6 @@ def process_emails(emails):
             subject = decode_str(msg.get("Subject"))
             message_id = msg.get("Message-ID")
             
-            # Generate UUID for empty message_id
             if not message_id or message_id.strip() == '':
                 message_id = f"<{str(uuid.uuid4())}@generated>"
                 add_log('WARNING', f'Generated new message_id for email from {from_email}: {message_id}')
@@ -92,8 +83,6 @@ def process_emails(emails):
                 add_log('WARNING', f'Invalid date format for email from {from_email}, using current time')
 
             try:
-                db.session.begin_nested()
-
                 existing_message = EmailMessage.query.filter_by(message_id=message_id).first()
                 if existing_message:
                     add_log('WARNING', f'Email with message_id {message_id} already exists, skipping')
@@ -114,9 +103,7 @@ def process_emails(emails):
 
                 if not thread_id:
                     thread_id = str(uuid.uuid4())
-                    thread = EmailThread()
-                    thread.thread_id = thread_id
-                    thread.subject = subject
+                    thread = EmailThread(thread_id=thread_id, subject=subject)
                     db.session.add(thread)
                     db.session.flush()
                 else:
@@ -124,30 +111,27 @@ def process_emails(emails):
                     if thread:
                         thread.last_updated = datetime.utcnow()
 
-                email_msg = EmailMessage()
-                email_msg.message_id = message_id
-                email_msg.thread_id = thread_id
-                email_msg.from_name = from_name
-                email_msg.from_email = from_email
-                email_msg.subject = subject
-                email_msg.body = body
-                email_msg.date = date
-                email_msg.in_reply_to = in_reply_to
-                email_msg.references = json.dumps(references)
-                email_msg.folder = folder
+                email_msg = EmailMessage(
+                    message_id=message_id,
+                    thread_id=thread_id,
+                    from_name=from_name,
+                    from_email=from_email,
+                    subject=subject,
+                    body=body,
+                    date=date,
+                    in_reply_to=in_reply_to,
+                    references=json.dumps(references),
+                    folder=folder
+                )
                 
                 db.session.add(email_msg)
                 db.session.commit()
 
-                add_log('INFO', f'Nuevo email procesado:\nThread ID: {thread_id}\nDe: {from_name} <{from_email}>\nFecha: {date_str}\nAsunto: {subject}\nMessage-ID: {message_id}\nIn-Reply-To: {in_reply_to or "N/A"}\n----------------------------------------\n{body[:50] + "..." if len(body) > 50 else body}')
+                add_log('INFO', f'Nuevo email procesado de {from_name} <{from_email}>')
 
             except SQLAlchemyError as e:
                 db.session.rollback()
                 add_log('ERROR', f'Database error processing email {message_id}: {str(e)}')
-                continue
-            except Exception as e:
-                db.session.rollback()
-                add_log('ERROR', f'Unexpected error processing email {message_id}: {str(e)}')
                 continue
 
         except Exception as e:
@@ -170,7 +154,7 @@ def bot_process():
                     email_client = EmailClient()
                     try:
                         email_client.connect()
-                        add_log('SUCCESS', 'Conexión establecida con el servidor de correo')
+                        add_log('INFO', 'Conexión establecida con el servidor de correo')
                         connection_retry_count = 0
                     except Exception as e:
                         connection_retry_count += 1
@@ -194,7 +178,6 @@ def bot_process():
                     if email_client:
                         try:
                             email_client.close_connection()
-                            add_log('WARNING', 'Conexión cerrada debido a error')
                         except:
                             pass
                     email_client = None
@@ -208,19 +191,10 @@ def bot_process():
                 if email_client:
                     try:
                         email_client.close_connection()
-                        add_log('WARNING', 'Conexión cerrada debido a error')
                     except:
                         pass
                 email_client = None
                 time.sleep(check_interval)
-        
-        if email_client:
-            try:
-                email_client.close_connection()
-                add_log('INFO', 'Conexión cerrada correctamente')
-            except Exception as e:
-                add_log('ERROR', f'Error al cerrar la conexión: {str(e)}')
-        add_log('INFO', 'Bot detenido')
 
 @app.route('/')
 def index():
@@ -247,8 +221,8 @@ def agente_configuracion():
             return render_template('agente_configuracion.html', config=config_data)
         
         try:
-            imap_port = int(config_data['IMAP_PORT'] or 0)
-            smtp_port = int(config_data['SMTP_PORT'] or 0)
+            imap_port = int(config_data['IMAP_PORT'])
+            smtp_port = int(config_data['SMTP_PORT'])
             if not (0 <= imap_port <= 65535 and 0 <= smtp_port <= 65535):
                 raise ValueError("Puerto inválido")
         except ValueError:
@@ -269,26 +243,39 @@ def agente_configuracion():
 
 @app.route('/agente/test-connection', methods=['POST'])
 def test_connection():
+    config_data = {}
+    for key in ['imap_server', 'imap_port', 'smtp_server', 'smtp_port', 'email_address', 'email_password']:
+        config_data[key.upper()] = request.form.get(key)
+    
+    if not all(config_data.values()):
+        return jsonify({
+            'status': 'error',
+            'message': 'Todos los campos son requeridos'
+        })
+
     try:
         client = EmailClient()
         client.connect()
         client.close_connection()
-        return jsonify({'status': 'success', 'message': 'Conexión exitosa a IMAP y SMTP'})
+        return jsonify({
+            'status': 'success',
+            'message': 'Conexión exitosa a IMAP y SMTP'
+        })
     except Exception as e:
-        return jsonify({'status': 'error', 'message': f'Error de conexión: {str(e)}'})
+        return jsonify({
+            'status': 'error',
+            'message': f'Error de conexión: {str(e)}'
+        })
 
 @app.route('/agente/clear-database', methods=['POST'])
 def clear_database():
     try:
-        # Stop bot if running
         global bot_running
         bot_running = False
         
-        # Drop and recreate all tables
         db.drop_all()
         db.create_all()
         
-        # Add success log
         add_log('INFO', 'Base de datos limpiada exitosamente')
         
         return jsonify({
@@ -320,14 +307,25 @@ def toggle_bot():
                 email_bot_thread = threading.Thread(target=bot_process)
                 email_bot_thread.daemon = True
                 email_bot_thread.start()
-                return jsonify({'status': 'success', 'message': 'Bot iniciado', 'running': True})
+                return jsonify({
+                    'status': 'success',
+                    'message': 'Bot iniciado',
+                    'running': True
+                })
             else:
                 bot_running = False
                 if email_bot_thread:
                     email_bot_thread.join(timeout=2)
-                return jsonify({'status': 'success', 'message': 'Bot detenido', 'running': False})
+                return jsonify({
+                    'status': 'success',
+                    'message': 'Bot detenido',
+                    'running': False
+                })
     except Exception as e:
-        return jsonify({'status': 'error', 'message': f'Error: {str(e)}'})
+        return jsonify({
+            'status': 'error',
+            'message': f'Error: {str(e)}'
+        })
 
 @app.route('/agente/bot/status')
 def bot_status():
@@ -338,30 +336,32 @@ def agente_logs():
     try:
         logs = Log.query.order_by(Log.timestamp.desc()).limit(100).all()
         return render_template('agente_logs.html', logs=logs)
-    except SQLAlchemyError as e:
-        app.logger.error(f'Error fetching logs: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        flash(f'Error al cargar los registros: {str(e)}', 'danger')
+        return render_template('agente_logs.html', logs=[])
 
 @app.route('/agente/logs/latest')
 def latest_logs():
     try:
         logs = Log.query.order_by(Log.timestamp.desc()).limit(5).all()
+        log_list = [{
+            'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            'level': log.level,
+            'level_class': log.level_class,
+            'message': log.message
+        } for log in logs]
+        
         return jsonify({
             'status': 'success',
-            'logs': [{
-                'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                'level': log.level,
-                'level_class': log.level_class,
-                'message': log.message
-            } for log in logs]
+            'logs': log_list
         })
     except Exception as e:
         app.logger.error(f'Error fetching latest logs: {str(e)}')
         return jsonify({
             'status': 'error',
-            'message': 'Error al cargar los registros',
+            'message': str(e),
             'logs': []
-        }), 500
+        })
 
 @app.route('/agente/dashboard')
 def agente_dashboard():
@@ -370,15 +370,13 @@ def agente_dashboard():
 @app.route('/agente/database')
 def agente_database():
     try:
-        # Get all unique senders
         senders = db.session.query(
-            EmailMessage.from_email, 
+            EmailMessage.from_email,
             EmailMessage.from_name
         ).distinct().all()
         
         sender_data = []
         for from_email, from_name in senders:
-            # Get all threads where this person is either sender or recipient
             threads = db.session.query(EmailThread).join(
                 EmailMessage,
                 EmailThread.thread_id == EmailMessage.thread_id
@@ -399,29 +397,13 @@ def agente_database():
             if threads:
                 thread_data = []
                 for thread in threads:
-                    # Get all messages in this thread with proper filtering
                     messages = EmailMessage.query.filter(
                         EmailMessage.thread_id == thread.thread_id,
                         or_(
                             EmailMessage.from_email == from_email,
                             EmailMessage.folder == 'Sent'
                         )
-                    ).group_by(
-                        EmailMessage.message_id,
-                        EmailMessage.id,
-                        EmailMessage.thread_id,
-                        EmailMessage.from_name,
-                        EmailMessage.from_email,
-                        EmailMessage.subject,
-                        EmailMessage.body,
-                        EmailMessage.date,
-                        EmailMessage.in_reply_to,
-                        EmailMessage.references,
-                        EmailMessage.folder,
-                        EmailMessage.reply_by_ia
-                    ).order_by(
-                        EmailMessage.date.asc()
-                    ).all()
+                    ).order_by(EmailMessage.date.asc()).all()
                     
                     if messages:
                         thread_data.append({
