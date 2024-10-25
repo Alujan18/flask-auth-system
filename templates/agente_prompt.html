@@ -1,26 +1,14 @@
 {% extends "base.html" %}
 
 {% block content %}
-<ul class="nav nav-tabs mb-4">
-    <!-- Otros tabs existentes -->
-    <li class="nav-item">
-        <a class="nav-link {% if request.endpoint == 'agente_recursos' %}active{% endif %}" href="{{ url_for('agente_recursos') }}">
-            <i class="bi bi-file-text me-2"></i>Recursos
-        </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link {% if request.endpoint == 'agente_prompt' %}active{% endif %}" href="{{ url_for('agente_prompt') }}">
-            <i class="bi bi-lightbulb me-2"></i>Prompt
-        </a>
-    </li>
-</ul>
+    {% include 'agente/agente_nav_tabs.html' %}
 
-<div class="card">
-    <div class="card-header">
-        <h4 class="mb-0">Prompt Construido</h4>
+    <div class="card">
+        <div class="card-header">
+            <h4 class="mb-0">Prompt Construido</h4>
+        </div>
+        <div class="card-body">
+            <pre style="white-space: pre-wrap;">{{ prompt }}</pre>
+        </div>
     </div>
-    <div class="card-body">
-        <pre style="white-space: pre-wrap;">{{ prompt }}</pre>
-    </div>
-</div>
 {% endblock %}

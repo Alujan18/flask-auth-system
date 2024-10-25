@@ -1,38 +1,37 @@
-<!-- agente_main.html -->
-
-
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container-fluid">
-    <h2 class="mb-4">Agente IA</h2>
-    <div class="row g-4">
-        <div class="col-md-6">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h5 class="card-title">
-                        <i class="bi bi-gear me-2"></i>Configuración
-                    </h5>
-                    <p class="card-text">Administra y configura los ajustes del Agente IA según tus necesidades.</p>
-                    <a href="{{ url_for('agente_configuracion') }}" class="btn btn-primary">
-                        Ir a Configuración
-                    </a>
+    {% include 'agente/agente_nav_tabs.html' %}
+
+    <div class="container-fluid">
+        <h2 class="mb-4">Agente IA</h2>
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-gear me-2"></i>Configuración
+                        </h5>
+                        <p class="card-text">Administra y configura los ajustes del Agente IA según tus necesidades.</p>
+                        <a href="{{ url_for('agente_configuracion') }}" class="btn btn-primary">
+                            Ir a Configuración
+                        </a>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h5 class="card-title">
-                        <i class="bi bi-speedometer2 me-2"></i>Dashboard
-                    </h5>
-                    <p class="card-text">Visualiza métricas y datos importantes del Agente IA en tiempo real.</p>
-                    <a href="{{ url_for('agente_dashboard') }}" class="btn btn-primary">
-                        Ir al Dashboard
-                    </a>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-speedometer2 me-2"></i>Dashboard
+                        </h5>
+                        <p class="card-text">Visualiza métricas y datos importantes del Agente IA en tiempo real.</p>
+                        <a href="{{ url_for('agente_dashboard') }}" class="btn btn-primary">
+                            Ir al Dashboard
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 {% endblock %}
