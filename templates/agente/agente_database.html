@@ -1,80 +1,69 @@
 {% extends "base.html" %}
 
 {% block content %}
-{% include 'agente/agente_nav_tabs.html' %}
+    {% include 'agente/agente_nav_tabs.html' %}
 
-<div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h4 class="mb-0">Email Database</h4>
-        <button class="btn btn-danger" onclick="clearDatabase()">
-            Clear Database
-        </button>
-    </div>
-    <div class="card-body">
-        {% if sender_data %}
-            <div class="accordion" id="emailAccordion">
-                {% for sender in sender_data %}
-                    <div class="accordion-item">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed" type="button" 
-                                    data-bs-toggle="collapse" 
-                                    data-bs-target="#sender{{ loop.index }}">
-                                {{ sender.name }} &lt;{{ sender.email }}&gt;
-                            </button>
-                        </h2>
-                        <div id="sender{{ loop.index }}" class="accordion-collapse collapse" 
-                             data-bs-parent="#emailAccordion">
-                            <div class="accordion-body">
-                                {% for thread_data in sender.threads %}
-                                    <div class="card mb-3">
-                                        <div class="card-header">
-                                            Thread: {{ thread_data.thread.subject or 'No Subject' }}
-                                        </div>
-                                        <div class="card-body">
-                                            {% for message in thread_data.messages %}
-                                                <div class="mb-3 p-3 border rounded">
-                                                    <div class="d-flex justify-content-between">
-                                                        <div>
-                                                            <strong>From:</strong> {{ message.from_name }} &lt;{{ message.from_email }}&gt;
-                                                        </div>
-                                                        <div class="text-muted">
-                                                            {{ message.date.strftime('%Y-%m-%d %H:%M:%S') }}
-                                                        </div>
-                                                    </div>
-                                                    <div class="mt-2">
-                                                        {{ message.body | replace('\n', '<br>') | safe }}
-                                                    </div>
-                                                </div>
-                                            {% endfor %}
-                                        </div>
+    <div class="accordion" id="emailAccordion">
+        {% for data in sender_data %}
+        <div class="accordion-item mb-3">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                        data-bs-target="#sender-{{ loop.index }}" aria-expanded="false">
+                    <div class="d-flex w-100 justify-content-between align-items-center">
+                        <strong>{{ data.name }} &lt;{{ data.email }}&gt;</strong>
+                    </div>
+                </button>
+            </h2>
+            <div id="sender-{{ loop.index }}" class="accordion-collapse collapse" 
+                 data-bs-parent="#emailAccordion">
+                <div class="accordion-body">
+                    {% for thread_data in data.threads %}
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                {{ thread_data.thread.subject or 'Sin Asunto' }}
+                                <small class="text-muted ms-2">
+                                    ({{ thread_data.thread.last_updated.strftime('%Y-%m-%d %H:%M:%S') }})
+                                </small>
+                            </h5>
+                            {% if thread_data.thread.reply_by_ia %}
+                                <span class="badge bg-success">Procesado por IA</span>
+                            {% else %}
+                                <span class="badge bg-secondary">No Procesado</span>
+                            {% endif %}
+                        </div>
+                        <div class="card-body">
+                            {% for message in thread_data.messages %}
+                            <div class="email-message mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>
+                                        <strong>{{ message.from_name }} &lt;{{ message.from_email }}&gt;</strong>
+                                        {% if message.folder == 'Sent' %}
+                                            <span class="badge bg-info ms-2">Enviado</span>
+                                        {% endif %}
                                     </div>
-                                {% endfor %}
+                                    {% if message.reply_by_ia %}
+                                        <span class="badge bg-success">Procesado por IA</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">No Procesado</span>
+                                    {% endif %}
+                                </div>
+                                <div class="ps-3 border-start">
+                                    <p class="text-muted mb-2">{{ message.date.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                                    {% if message.folder == 'Sent' %}
+                                        <p class="mb-0">{{ message.body.split('El')[0] if message.body and 'El' in message.body else message.body }}</p>
+                                    {% else %}
+                                        <p class="mb-0">{{ message.body }}</p>
+                                    {% endif %}
+                                </div>
                             </div>
+                            {% endfor %}
                         </div>
                     </div>
-                {% endfor %}
+                    {% endfor %}
+                </div>
             </div>
-        {% else %}
-            <p class="text-center">No emails in database</p>
-        {% endif %}
+        </div>
+        {% endfor %}
     </div>
-</div>
-
-<script>
-function clearDatabase() {
-    if (confirm('Are you sure you want to clear the database? This action cannot be undone.')) {
-        fetch('/agente/clear-database', {
-            method: 'POST'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                location.reload();
-            } else {
-                alert(data.message);
-            }
-        });
-    }
-}
-</script>
 {% endblock %}
