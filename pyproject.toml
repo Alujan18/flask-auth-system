@@ -13,4 +13,5 @@ dependencies = [
     "werkzeug",
     "openai",
     "sqlalchemy",
+    "gitpython>=3.1.43",
 ]
