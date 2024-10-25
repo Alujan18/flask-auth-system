@@ -278,7 +278,7 @@ def agente_configuracion():
         
         if not all(config_data.values()):
             flash('All fields are required.', 'danger')
-            return render_template('agente_configuracion.html', config=config_data)
+            return render_template('agente/agente_configuracion.html', config=config_data)
         
         try:
             imap_port = int(config_data['IMAP_PORT'] or 0)
@@ -287,7 +287,7 @@ def agente_configuracion():
                 raise ValueError("Invalid port")
         except ValueError:
             flash('Ports must be valid numbers between 0 and 65535.', 'danger')
-            return render_template('agente_configuracion.html', config=config_data)
+            return render_template('agente/agente_configuracion.html', config=config_data)
         
         try:
             save_to_env_file(config_data)
@@ -297,9 +297,9 @@ def agente_configuracion():
         except Exception as e:
             app.logger.error(f'Error saving configuration: {str(e)}')
             flash(f'Error saving configuration: {str(e)}', 'danger')
-            return render_template('agente_configuracion.html', config=config_data)
+            return render_template('agente/agente_configuracion.html', config=config_data)
     
-    return render_template('agente_configuracion.html', config=load_email_config())
+    return render_template('agente/agente_configuracion.html', config=load_email_config())
 
 @app.route('/agente/test-connection', methods=['POST'])
 def test_connection():
@@ -377,11 +377,10 @@ def agente_logs():
             app.logger.info('Log table created')
         
         logs = Log.query.order_by(Log.timestamp.desc()).limit(50).all()
-        return render_template('agente_logs.html', logs=logs)
+        return render_template('agente/agente_logs.html', logs=logs)
     except Exception as e:
         app.logger.error(f'Error loading logs: {str(e)}')
-        # Make sure we return a valid template even when there's an error
-        return render_template('agente_logs.html', logs=[])
+        return render_template('agente/agente_logs.html', logs=[])
 
 @app.route('/agente/logs/latest')
 def latest_logs():
@@ -415,7 +414,7 @@ def latest_logs():
 
 @app.route('/agente/dashboard')
 def agente_dashboard():
-    return render_template('agente_dashboard.html')
+    return render_template('agente/agente_dashboard.html')
 
 @app.route('/agente/database')
 def agente_database():
@@ -471,11 +470,11 @@ def agente_database():
                         'threads': thread_data
                     })
         
-        return render_template('agente_database.html', sender_data=sender_data)
+        return render_template('agente/agente_database.html', sender_data=sender_data)
     except Exception as e:
         app.logger.error(f'Error in agente_database: {str(e)}')
         flash(f'Error loading data: {str(e)}', 'danger')
-        return render_template('agente_database.html', sender_data=[])
+        return render_template('agente/agente_database.html', sender_data=[])
 
 @app.route('/agente/recursos')
 def agente_recursos():
@@ -506,7 +505,7 @@ def agente_recursos():
                         'content': content[:1000] + '...' if len(content) > 1000 else content
                     })
     
-    return render_template('agente_recursos.html', 
+    return render_template('agente/agente_recursos.html', 
                          prompt_files=prompt_files,
                          info_files=info_files)
 
@@ -586,5 +585,4 @@ def agente_prompt():
     # Construir el prompt
     prompt = build_prompt(prompt_files_contents, info_principal_content, message_thread_content)
 
-    return render_template('agente_prompt.html', prompt=prompt)
-
+    return render_template('agente/agente_prompt.html', prompt=prompt)

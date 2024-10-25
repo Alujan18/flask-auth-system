@@ -24,6 +24,12 @@
         </a>
     </li>
     <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'agente_recursos' %}active{% endif %}" 
+           href="{{ url_for('agente_recursos') }}">
+            <i class="bi bi-folder me-2"></i>Recursos
+        </a>
+    </li>
+    <li class="nav-item">
         <a class="nav-link {% if request.endpoint == 'agente_prompt' %}active{% endif %}" 
            href="{{ url_for('agente_prompt') }}">
             <i class="bi bi-chat-dots me-2"></i>Prompt
