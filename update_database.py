@@ -1,3 +1,5 @@
+#update_database.py
+
 from app import app, db
 
 def update_database():

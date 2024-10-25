@@ -1,3 +1,5 @@
+<!-- agente_configuracion.html -->
+
 {% extends "base.html" %}
 
 {% block content %}
@@ -27,7 +29,13 @@
             <i class="bi bi-file-text me-2"></i>Recursos
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'agente_prompt' %}active{% endif %}" href="{{ url_for('agente_prompt') }}">
+            <i class="bi bi-lightbulb me-2"></i>Prompt
+        </a>
+    </li>
 </ul>
+
 
 <div class="card">
     <div class="card-header">

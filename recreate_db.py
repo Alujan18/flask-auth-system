@@ -1,3 +1,5 @@
+#recreate_db.py
+
 from app import app, db
 
 def recreate_database():

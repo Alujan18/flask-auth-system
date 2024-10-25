@@ -1,3 +1,5 @@
+#routes.py
+
 from flask import render_template, redirect, url_for, request, flash, jsonify
 from app import app, db
 import os
@@ -15,6 +17,8 @@ import json
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import inspect, or_, and_
 from werkzeug.utils import secure_filename
+from prompt_builder import build_prompt
+
 
 # Load environment variables
 load_dotenv()
@@ -536,3 +540,51 @@ def handle_upload(upload_type):
         add_log('ERROR', f'Invalid file upload attempt to {upload_type} directory')
     
     return redirect(url_for('agente_recursos'))
+
+
+@app.route('/agente/prompt')
+def agente_prompt():
+    # Leer archivos de prompt
+    prompt_files_dir = os.path.join(app.root_path, AGENTE_IA_FOLDER, 'prompt')
+    prompt_files_contents = []
+    if os.path.exists(prompt_files_dir):
+        for filename in os.listdir(prompt_files_dir):
+            if filename.endswith('.txt'):
+                file_path = os.path.join(prompt_files_dir, filename)
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    prompt_files_contents.append(content)
+
+    # Leer info_principal
+    info_principal_path = os.path.join(app.root_path, AGENTE_IA_FOLDER, 'info', 'info_principal.txt')
+    if os.path.exists(info_principal_path):
+        with open(info_principal_path, 'r', encoding='utf-8') as f:
+            info_principal_content = f.read()
+    else:
+        info_principal_content = ''
+
+    # Obtener un hilo de mensajes "no procesado"
+    thread = EmailThread.query.filter_by(reply_by_ia=False).first()
+    if thread:
+        # Obtener mensajes en este hilo
+        messages = EmailMessage.query.filter_by(thread_id=thread.thread_id).order_by(EmailMessage.date.asc()).all()
+        # Construir el contenido del hilo de mensajes
+        message_thread_content = ''
+        for message in messages:
+            sender = f"{message.from_name} <{message.from_email}>"
+            date_str = message.date.strftime('%Y-%m-%d %H:%M:%S') if message.date else 'Fecha desconocida'
+            subject = message.subject or 'Sin Asunto'
+            message_content = message.body or ''
+            message_thread_content += f"From: {sender}\n"
+            message_thread_content += f"Date: {date_str}\n"
+            message_thread_content += f"Subject: {subject}\n"
+            message_thread_content += f"Body:\n{message_content}\n"
+            message_thread_content += "-"*80 + "\n"
+    else:
+        message_thread_content = 'No se encontraron hilos no procesados.'
+
+    # Construir el prompt
+    prompt = build_prompt(prompt_files_contents, info_principal_content, message_thread_content)
+
+    return render_template('agente_prompt.html', prompt=prompt)
+
